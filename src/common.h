@@ -9,6 +9,55 @@
 	#include "WProgram.h"
 #endif
 
+#include "neotimer.h"
+
+#define STRING_LEN 50
+#define NUMBER_LEN 6
+
+#define Relay1 0
+#define Relay2 1
+#define Relay3 2
+#define Relay4 3
+#define RelayMax 4
+
+#define Shelly1 0
+#define Shelly2 1
+#define Shelly3 2
+#define Shelly4 3
+#define Shelly5 4
+#define Shelly6 5
+#define Shelly7 6
+#define Shelly8 7
+#define Shelly9 8
+#define Shelly10 9
+#define ShellyMax 10
+
+
+struct Relay {
+	char Name[STRING_LEN];
+	char Power[NUMBER_LEN];
+	char GPIO[NUMBER_LEN];
+	char Delay[NUMBER_LEN];
+	bool Enabled;
+	Neotimer timer;
+};
+
+struct Shelly {
+	char Name[STRING_LEN];
+	char url_On[STRING_LEN];
+	char url_Off[STRING_LEN];
+	char Power[NUMBER_LEN];
+	char Delay[NUMBER_LEN];
+	bool Enabled;
+	Neotimer timer;
+};
+
+Shelly Shellys[ShellyMax];
+Relay Relays[RelayMax];
+
+
+
+
 // > 0: feeding power to the power grid < 0: obtaining 	power from the power grid
 extern int gActivePower;
 

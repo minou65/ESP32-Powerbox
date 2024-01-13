@@ -218,6 +218,18 @@ iotwebconf::UIntTParameter<uint16_t> Output4Power =
     placeholder("1..10000").
     build();
 
+
+httpGroup httpgroup0 = httpGroup(Shelly1);
+httpGroup httpgroup1 = httpGroup(Shelly2);
+httpGroup httpgroup2 = httpGroup(Shelly3);
+httpGroup httpgroup3 = httpGroup(Shelly4);
+httpGroup httpgroup4 = httpGroup(Shelly5);
+httpGroup httpgroup5 = httpGroup(Shelly6);
+httpGroup httpgroup6 = httpGroup(Shelly7);
+httpGroup httpgroup7 = httpGroup(Shelly8);
+httpGroup httpgroup8 = httpGroup(Shelly9);
+httpGroup httpgroup9 = httpGroup(Shelly10);
+
 void wifiInit() {
     Serial.begin(115200);
     Serial.println();
@@ -250,11 +262,32 @@ void wifiInit() {
     Output4Group.addItem(&Output4GPIO);
     Output4Group.addItem(&Output4Power);
 
+    httpgroup0.setNext(&httpgroup1);
+    httpgroup1.setNext(&httpgroup2);
+    httpgroup2.setNext(&httpgroup3);
+    httpgroup3.setNext(&httpgroup4);
+    httpgroup4.setNext(&httpgroup5);
+    httpgroup5.setNext(&httpgroup6);
+    httpgroup6.setNext(&httpgroup7);
+    httpgroup7.setNext(&httpgroup8);
+    httpgroup8.setNext(&httpgroup9);
+
     iotWebConf.addParameterGroup(&sysConfGroup);
     iotWebConf.addParameterGroup(&Output1Group);
     iotWebConf.addParameterGroup(&Output2Group);
     iotWebConf.addParameterGroup(&Output3Group);
     iotWebConf.addParameterGroup(&Output4Group);
+
+    iotWebConf.addParameterGroup(&httpgroup0);
+    iotWebConf.addParameterGroup(&httpgroup1);
+    iotWebConf.addParameterGroup(&httpgroup2);
+    iotWebConf.addParameterGroup(&httpgroup3);
+    iotWebConf.addParameterGroup(&httpgroup4);
+    iotWebConf.addParameterGroup(&httpgroup5);
+    iotWebConf.addParameterGroup(&httpgroup6);
+    iotWebConf.addParameterGroup(&httpgroup7);
+    iotWebConf.addParameterGroup(&httpgroup8);
+    iotWebConf.addParameterGroup(&httpgroup9);
 
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
@@ -356,6 +389,26 @@ void handleRoot() {
     else {
         page += "<tr><td align=left>" + name + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
     }
+
+    page += HTML_End_Table;
+    page += HTML_End_Fieldset;
+
+    page += HTML_Start_Fieldset;
+    page += HTML_Fieldset_Legend;
+    page.replace("{l}", "Shellys");
+    page += HTML_Start_Table;
+
+    for (uint8_t i = 0; i < ShellyMax; i++){
+        if (Shellys[i].Power > 0) {
+            if (Shellys[i].Enabled) {
+                page += "<tr><td align=left>" + String(Shellys[i].Name) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
+            }
+            else {
+                page += "<tr><td align=left>" + String(Shellys[i].Name) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
+            }
+        }
+    }
+
 
     page += HTML_End_Table;
     page += HTML_End_Fieldset;
