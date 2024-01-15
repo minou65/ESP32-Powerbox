@@ -23,7 +23,7 @@ void httpget(String URL_) {
 
 void httpSetup() {
     for (uint8_t i = 0; i < ShellyMax; i++){
-        Shellys[i].timer.init();
+        Shellys[i].timer.start();
     }
     httpDisableAll();
 }
@@ -31,16 +31,17 @@ void httpSetup() {
 void httpLoop() {
     for (uint8_t i = 0; i < ShellyMax; i++){
         if (Shellys[i].Power > 0) {
-            Shellys[i].Enabled = gActivePower > atoi(Shellys[i].Power);
-            Shellys[i].timer.start(atoi(Shellys[i].Delay));
+            Shellys[i].Enabled = gActivePower > Shellys[i].Power;
+            Shellys[i].timer.set(Shellys[i].Delay *1000 * 60);
+            Shellys[i].timer.start();
         } else {
             Shellys[i].Enabled = false;
         }
 
         if (Shellys[i].Enabled) {
             httpget(Shellys[i].url_On);
-        } elseif (Shellys[i].timer.done()) {
-            httpget(Shellys[i].url_Off);
+        } else if (Shellys[i].timer.done()) {
+           // httpget(Shellys[i].url_Off);
         }
     }
 }

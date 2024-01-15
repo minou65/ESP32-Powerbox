@@ -5,21 +5,24 @@
 */
 
 // the setup function runs once when you press reset or power the board
-
-
 #include <IotWebConf.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
+
 #include "common.h"
-#include "webhandling.h"
+
 #include "inverterhandling.h"
 #include "RelayHandling.h"
+#include "webhandling.h"
 #include "httphandling.h"
 
-
 void setup() {
+	WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
 	RelaySetup();
 	httpSetup();
 	InverterSetup();
 	wifiInit();
+	WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //enable brownout detector
 }
 
 void loop() {

@@ -7,19 +7,19 @@
 
 char gOutput1Name[20] = "Relay 1";
 int gOutput1Power = 0;
-uint8_t gOutput1GPIO = D1;
+uint8_t gOutput1GPIO = GPIO_NUM_22;
 
 char gOutput2Name[20] = "Relay 2";
 int gOutput2Power = 0;
-uint8_t gOutput2GPIO = D2;
+uint8_t gOutput2GPIO = GPIO_NUM_21;
 
 char gOutput3Name[20] = "Relay 3";
 int gOutput3Power = 0;
-uint8_t gOutput3GPIO = D3;
+uint8_t gOutput3GPIO = GPIO_NUM_17;
 
 char gOutput4Name[20] = "Relay 4";
 int gOutput4Power = 0;
-uint8_t gOutput4GPIO = D4;
+uint8_t gOutput4GPIO = GPIO_NUM_16;
 
 
 bool gRelay1 = false;

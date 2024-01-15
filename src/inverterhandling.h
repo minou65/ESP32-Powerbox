@@ -9,11 +9,10 @@
 	#include "WProgram.h"
 #endif
 
-
-#endif
-
 void InverterSetup();
 
 void InverterLoop();
 
 void InverterRequest(String ip, uint16_t port, uint16_t startaddress, uint16_t number);
+
+#endif

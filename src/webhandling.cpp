@@ -26,7 +26,7 @@
 #include "webhandling.h"
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "B8"
+#define CONFIG_VERSION "A0"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -57,6 +57,9 @@ bool gParamsChanged = true;
 
 DNSServer dnsServer;
 WebServer server(80);
+
+Shelly Shellys[ShellyMax];
+Relay Relays[RelayMax];
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 
@@ -125,7 +128,7 @@ iotwebconf::TextTParameter<20> Output1Name =
 iotwebconf::UIntTParameter<uint8_t> Output1GPIO =
     iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("Output1GPIO").
     label("GPIO").
-    defaultValue(D1).
+    defaultValue(GPIO_NUM_1).
     min(1u).
     step(1).
     placeholder("1..255").
@@ -151,7 +154,7 @@ iotwebconf::TextTParameter<20> Output2Name =
 iotwebconf::UIntTParameter<uint8_t> Output2GPIO =
     iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("Output2GPIO").
     label("GPIO").
-    defaultValue(D2).
+    defaultValue(GPIO_NUM_2).
     min(1u).
     step(1).
     placeholder("1..255").
@@ -177,7 +180,7 @@ iotwebconf::TextTParameter<20> Output3Name =
 iotwebconf::UIntTParameter<uint8_t> Output3GPIO =
     iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("Output3GPIO").
     label("GPIO").
-    defaultValue(D3).
+    defaultValue(GPIO_NUM_3).
     min(1u).
     step(1).
     placeholder("1..255").
@@ -203,7 +206,7 @@ iotwebconf::TextTParameter<20> Output4Name =
 iotwebconf::UIntTParameter<uint8_t> Output4GPIO =
     iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("Output4GPIO").
     label("GPIO").
-    defaultValue(D4).
+    defaultValue(GPIO_NUM_4).
     min(1u).
     step(1).
     placeholder("1..255").
@@ -219,16 +222,18 @@ iotwebconf::UIntTParameter<uint16_t> Output4Power =
     build();
 
 
-httpGroup httpgroup0 = httpGroup(Shelly1);
-httpGroup httpgroup1 = httpGroup(Shelly2);
-httpGroup httpgroup2 = httpGroup(Shelly3);
-httpGroup httpgroup3 = httpGroup(Shelly4);
-httpGroup httpgroup4 = httpGroup(Shelly5);
-httpGroup httpgroup5 = httpGroup(Shelly6);
-httpGroup httpgroup6 = httpGroup(Shelly7);
-httpGroup httpgroup7 = httpGroup(Shelly8);
-httpGroup httpgroup8 = httpGroup(Shelly9);
-httpGroup httpgroup9 = httpGroup(Shelly10);
+httpGroup httpgroup0 = httpGroup("Shelly1");
+httpGroup httpgroup1 = httpGroup("Shelly2");
+httpGroup httpgroup2 = httpGroup("Shelly3");
+httpGroup httpgroup3 = httpGroup("Shelly4");
+httpGroup httpgroup4 = httpGroup("Shelly5");
+httpGroup httpgroup5 = httpGroup("Shelly6");
+httpGroup httpgroup6 = httpGroup("Shelly7");
+httpGroup httpgroup7 = httpGroup("Shelly8");
+httpGroup httpgroup8 = httpGroup("Shelly9");
+httpGroup httpgroup9 = httpGroup("Shelly10");
+
+iotwebconf::OptionalGroupHtmlFormatProvider optionalGroupHtmlFormatProvider;
 
 void wifiInit() {
     Serial.begin(115200);
@@ -238,6 +243,18 @@ void wifiInit() {
 
     iotWebConf.setStatusPin(STATUS_PIN, ON_LEVEL);
     iotWebConf.setConfigPin(CONFIG_PIN);
+
+    iotWebConf.setHtmlFormatProvider(&optionalGroupHtmlFormatProvider);
+
+    httpgroup0.setNext(&httpgroup1);
+    httpgroup1.setNext(&httpgroup2);
+    httpgroup2.setNext(&httpgroup3);
+    httpgroup3.setNext(&httpgroup4);
+    httpgroup4.setNext(&httpgroup5);
+    httpgroup5.setNext(&httpgroup6);
+    httpgroup6.setNext(&httpgroup7);
+    httpgroup7.setNext(&httpgroup8);
+    httpgroup8.setNext(&httpgroup9);
 
     sysConfGroup.addItem(&InverterIPAddress);
     sysConfGroup.addItem(&InverterPort);
@@ -261,16 +278,6 @@ void wifiInit() {
     Output4Group.addItem(&Output4Name);
     Output4Group.addItem(&Output4GPIO);
     Output4Group.addItem(&Output4Power);
-
-    httpgroup0.setNext(&httpgroup1);
-    httpgroup1.setNext(&httpgroup2);
-    httpgroup2.setNext(&httpgroup3);
-    httpgroup3.setNext(&httpgroup4);
-    httpgroup4.setNext(&httpgroup5);
-    httpgroup5.setNext(&httpgroup6);
-    httpgroup6.setNext(&httpgroup7);
-    httpgroup7.setNext(&httpgroup8);
-    httpgroup8.setNext(&httpgroup9);
 
     iotWebConf.addParameterGroup(&sysConfGroup);
     iotWebConf.addParameterGroup(&Output1Group);
@@ -398,17 +405,28 @@ void handleRoot() {
     page.replace("{l}", "Shellys");
     page += HTML_Start_Table;
 
-    for (uint8_t i = 0; i < ShellyMax; i++){
-        if (Shellys[i].Power > 0) {
-            if (Shellys[i].Enabled) {
-                page += "<tr><td align=left>" + String(Shellys[i].Name) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
+    for (uint8_t _i = 0; _i < ShellyMax; _i++){
+        if (Shellys[_i].Power > 0) {
+            if (Shellys[_i].Enabled) {
+                page += "<tr><td align=left>" + String(Shellys[_i].Name) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
             }
             else {
-                page += "<tr><td align=left>" + String(Shellys[i].Name) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
+                page += "<tr><td align=left>" + String(Shellys[_i].Name) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
             }
         }
     }
 
+
+    page += HTML_End_Table;
+    page += HTML_End_Fieldset;
+
+    page += HTML_Start_Fieldset;
+    page += HTML_Fieldset_Legend;
+    page.replace("{l}", "Network");
+    page += HTML_Start_Table;
+
+    page += "<tr><td align=left>MAC Address:</td><td>" + String(WiFi.macAddress()) + "</td></tr>";
+    page += "<tr><td align=left>IP Address:</td><td>" + String(WiFi.localIP().toString().c_str()) + "</td></tr>";
 
     page += HTML_End_Table;
     page += HTML_End_Fieldset;
@@ -452,6 +470,39 @@ void convertParams() {
     gInverterActivePowerDataLength = InverterActivePowerDataLength.value();
     gInverterActivePowerGain = InverterActivePowerGain.value();
     gInverterActivePowerInterval = InverterActivePowerInterval.value();
+
+    httpGroup* _httpgroup = &httpgroup0;
+    uint8_t _i = 0;
+    while (_httpgroup != nullptr) {
+        Serial.printf("Set Shelly %i\n", _i);
+        if (_httpgroup->isActive()) {
+            strcpy(Shellys[_i].Name, _httpgroup->DesignationValue);
+            strcpy(Shellys[_i].url_On, _httpgroup->url_OnValue);
+            strcpy(Shellys[_i].url_Off, _httpgroup->url_OffValue);
+            Shellys[_i].Enabled = false;
+            Shellys[_i].Delay = atoi(_httpgroup->DelayValue);
+            Shellys[_i].Power = atoi(_httpgroup->PowerValue);
+            Shellys[_i].timer.start(Shellys[_i].Delay * 1000 * 60);
+
+            Serial.printf("    Power %dW\n", Shellys[_i].Power);
+            Serial.printf("    Delay %dminutes\n", Shellys[_i].Delay);
+
+
+        }
+        else {
+            strcpy(Shellys[_i].Name, "Shelly");
+            strcpy(Shellys[_i].url_On, "http://");
+            strcpy(Shellys[_i].url_Off, "http://");
+            Shellys[_i].Enabled = false;
+            Shellys[_i].Delay = 0;
+            Shellys[_i].Power = 0;
+            Shellys[_i].timer.start(1000);
+        }
+
+        _httpgroup = (httpGroup*)_httpgroup->getNext();
+        _i++;
+
+    }
 
 }
 

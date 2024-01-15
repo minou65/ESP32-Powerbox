@@ -5,9 +5,9 @@
 #define _NEOTIMER_h
 
 #if defined(ARDUINO) && ARDUINO >= 100
-	#include "arduino.h"
+#include "arduino.h"
 #else
-	#include "WProgram.h"
+#include "WProgram.h"
 #endif
 
 #define NEOTIMER_INDEFINITE -1
@@ -29,6 +29,7 @@ public:
 	boolean waiting();		// Indicates timer is started but not finished
 	boolean started();		// Indicates timer has started
 	void start();			//Starts a timer
+	void start(unsigned long t);
 	unsigned long stop();	//Stops a timer and returns elapsed time
 	unsigned long getEllapsed();	// Gets the ellapsed time
 	void restart();
@@ -53,4 +54,3 @@ private:
 
 
 #endif
-

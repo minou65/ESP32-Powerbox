@@ -39,24 +39,21 @@ struct Relay {
 	char GPIO[NUMBER_LEN];
 	char Delay[NUMBER_LEN];
 	bool Enabled;
-	Neotimer timer;
+	Neotimer timer = Neotimer(1000);
 };
 
 struct Shelly {
-	char Name[STRING_LEN];
-	char url_On[STRING_LEN];
-	char url_Off[STRING_LEN];
-	char Power[NUMBER_LEN];
-	char Delay[NUMBER_LEN];
-	bool Enabled;
-	Neotimer timer;
+	char Name[STRING_LEN] = "Shelly";
+	char url_On[STRING_LEN] = "http://";
+	char url_Off[STRING_LEN] = "http://";
+	uint16_t Power = 0;
+	uint8_t Delay = 0;
+	bool Enabled = false;
+	Neotimer timer = Neotimer(1000);
 };
 
-Shelly Shellys[ShellyMax];
-Relay Relays[RelayMax];
-
-
-
+extern Shelly Shellys[ShellyMax];
+extern Relay Relays[RelayMax];
 
 // > 0: feeding power to the power grid < 0: obtaining 	power from the power grid
 extern int gActivePower;
