@@ -58,7 +58,7 @@ bool gParamsChanged = true;
 DNSServer dnsServer;
 WebServer server(80);
 
-Shelly Shellys[ShellyMax];
+
 Relay Relays[RelayMax];
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
@@ -341,6 +341,7 @@ void handleRoot() {
     // page.replace("center", "left");
     page += ".dot-grey{height: 12px; width: 12px; background-color: #bbb; border-radius: 50%; display: inline-block; }";
     page += ".dot-green{height: 12px; width: 12px; background-color: green; border-radius: 50%; display: inline-block; }";
+    page += ".blink-green{2s blink-green ease infinite; height: 12px; width: 12px; background-color: orange; border-radius: 50%; display: inline-block; }";
 
     page += "</style>";
 
@@ -355,6 +356,7 @@ void handleRoot() {
         page += HTML_Start_Table;
 
         page += "<tr><td align=left>Active:</td><td>" + String(gActivePower) + "W" + "</td></tr>";
+        page += "<tr><td align=left>Intervall:</td><td>" + String(gInverterActivePowerInterval) + "s" + "</td></tr>";
 
         page += HTML_End_Table;
     page += HTML_End_Fieldset;
@@ -407,8 +409,11 @@ void handleRoot() {
 
     for (uint8_t _i = 0; _i < ShellyMax; _i++){
         if (Shellys[_i].Power > 0) {
-            if (Shellys[_i].Enabled) {
+            if ((Shellys[_i].Enabled == true) && (gActivePower > Shellys[_i].Power)) {
                 page += "<tr><td align=left>" + String(Shellys[_i].Name) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
+            }
+            else if ((Shellys[_i].Enabled == true) && (gActivePower <= Shellys[_i].Power)) {
+                page += "<tr><td align=left>" + String(Shellys[_i].Name) + ":</td><td><span class = \"blink-green\"></span></td></tr>";
             }
             else {
                 page += "<tr><td align=left>" + String(Shellys[_i].Name) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
@@ -474,20 +479,13 @@ void convertParams() {
     httpGroup* _httpgroup = &httpgroup0;
     uint8_t _i = 0;
     while (_httpgroup != nullptr) {
-        Serial.printf("Set Shelly %i\n", _i);
         if (_httpgroup->isActive()) {
             strcpy(Shellys[_i].Name, _httpgroup->DesignationValue);
             strcpy(Shellys[_i].url_On, _httpgroup->url_OnValue);
             strcpy(Shellys[_i].url_Off, _httpgroup->url_OffValue);
-            Shellys[_i].Enabled = false;
             Shellys[_i].Delay = atoi(_httpgroup->DelayValue);
             Shellys[_i].Power = atoi(_httpgroup->PowerValue);
             Shellys[_i].timer.start(Shellys[_i].Delay * 1000 * 60);
-
-            Serial.printf("    Power %dW\n", Shellys[_i].Power);
-            Serial.printf("    Delay %dminutes\n", Shellys[_i].Delay);
-
-
         }
         else {
             strcpy(Shellys[_i].Name, "Shelly");

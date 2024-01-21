@@ -89,5 +89,9 @@ extern uint8_t gInverterActivePowerInterval;
 
 extern bool gParamsChanged;
 
+extern bool gUseNTPServer;
+extern String gNTPServer;
+extern String gTimeZone;
+
 #endif
 
