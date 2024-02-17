@@ -1,22 +1,100 @@
 # PVPowerbox
 
+## Table of contents
+- [PVPowerbox](#pvpowerbox)
+  - [Table of contents](#table-of-contents)
+  - [Desription](#desription)
+  - [Settings](#settings)
+    - [Inverter](#inverter)
+      - [IPAddress](#ipaddress)
+      - [Port](#port)
+      - [Register Input power](#register-input-power)
+      - [Data Length](#data-length)
+      - [Gain](#gain)
+      - [Interval (seconds)](#interval-seconds)
+    - [Relay](#relay)
+      - [Designation](#designation)
+      - [Power (W)](#power-w)
+      - [GPIO](#gpio)
+    - [Shelly](#shelly)
+      - [Designation](#designation-1)
+      - [Power (W)](#power-w-1)
+      - [URL on](#url-on)
+      - [URL off](#url-off)
+      - [minimum on time (minutes)](#minimum-on-time-minutes)
+    - [WiFi](#wifi)
+      - [Default Password](#default-password)
+      - [Default IP address](#default-ip-address)
+      - [OTA](#ota)
+      - [Configuration options](#configuration-options)
+  - [Blinking codes](#blinking-codes)
+  - [Reset](#reset)
 
-## WiFi
+## Desription
 
-### Default Password
+## Settings
+### Inverter
+#### IPAddress
+IP address of the inverter
 
+#### Port
+
+
+#### Register Input power
+Register where the Input power is sored. See inverter documentation
+
+#### Data Length
+How many bytes should be read. See inverter documentation.
+
+#### Gain
+The gain setting is used to adjust the output power. See inverter documentation.
+
+#### Interval (seconds)
+This setting specifies the time interval in seconds between each polling of the inverter.
+
+### Relay
+#### Designation
+Description of the output
+
+#### Power (W)
+What power from the photovoltaic system is necessary for the output to be activated
+
+#### GPIO
+Default GPIO's are 
+- Relay 1 = 1
+- Relay 2 = 2
+- Relay 3 = 3
+- Relay 4 = 4
+
+### Shelly
+#### Designation
+Description of the output
+
+#### Power (W)
+What power from the photovoltaic system is necessary for the output to be activated
+
+#### URL on
+URL to turn on Shelly
+
+#### URL off
+URL to turn off Shelly
+
+#### minimum on time (minutes)
+Switch-off delay when the power falls below the power setting
+
+### WiFi
+
+#### Default Password
 When not connected to an AP the default password is 123456789
 
-### Default IP address
-
+#### Default IP address
 When in AP mode, the default IP address is 192.168.4.1
 
-### OTA 
+#### OTA 
 OTA is enabled, use default IP address or if connected to a AP the correct address.
 Port is the default port.
 
-### Configuration options
-
+#### Configuration options
 After the first boot, there are some values needs to be set up.
 These items are maked with __*__ (star) in the list below.
 
@@ -39,8 +117,7 @@ to connect to. __*__
 - __WiFi password__ - The password of the network above. Note, that
 unsecured passwords are not supported in your protection. __*__
 
-### Blinking codes
-
+## Blinking codes
 Prevoius chapters were mentioned blinking patterns, now here is a
 table summarize the menaning of the blink codes.
 
@@ -52,8 +129,7 @@ network around it. You can connect to the device with your smartphone
 WiFi network.
 - __Mostly off with occasional short flash__ - The device is online.
 
-### Reset
-
+## Reset
 When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 password to buld an AP. (E.g. in case of lost password)
 

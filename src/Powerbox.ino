@@ -4,20 +4,30 @@
  Author:	andy
 */
 
-// the setup function runs once when you press reset or power the board
 
+#include "ntp.h"
+#include <IotWebConf.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
-#include "RelayHandling.h"
 #include "common.h"
-#include "webhandling.h"
+
 #include "inverterhandling.h"
 #include "RelayHandling.h"
-
+#include "ShellyHandling.h"
+#include "webhandling.h"
 
 void setup() {
-	RelaySetup();
-	InverterSetup();
+	Serial.begin(115200);
+	while (!Serial) {
+		delay(1);
+	}
+
 	wifiInit();
+	NTPInit();
+	RelaySetup();
+	ShellySetup();
+	InverterSetup();
 }
 
 void loop() {
@@ -25,9 +35,12 @@ void loop() {
 	if (iotWebConf.getState() == iotwebconf::OnLine) {
 		InverterLoop();
 		RelayLoop();
+        ShellyLoop();
+		NTPloop();
 	}
 	else {
 		RelayDisableAll();
+		// ShellyDisableAll();
 	}
 
 	gParamsChanged = false;
