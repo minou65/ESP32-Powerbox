@@ -4,6 +4,7 @@
  Author:	andy
 */
 
+
 #include "ntp.h"
 #include <IotWebConf.h>
 #include "soc/soc.h"
@@ -13,11 +14,10 @@
 
 #include "inverterhandling.h"
 #include "RelayHandling.h"
+#include "ShellyHandling.h"
 #include "webhandling.h"
-#include "httphandling.h"
 
 void setup() {
-
 	Serial.begin(115200);
 	while (!Serial) {
 		delay(1);
@@ -26,7 +26,7 @@ void setup() {
 	wifiInit();
 	NTPInit();
 	RelaySetup();
-	httpSetup();
+	ShellySetup();
 	InverterSetup();
 }
 
@@ -35,12 +35,12 @@ void loop() {
 	if (iotWebConf.getState() == iotwebconf::OnLine) {
 		InverterLoop();
 		RelayLoop();
-		httpLoop();
+        ShellyLoop();
 		NTPloop();
 	}
 	else {
 		RelayDisableAll();
-		// httpDisableAll();
+		// ShellyDisableAll();
 	}
 
 	gParamsChanged = false;

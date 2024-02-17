@@ -44,10 +44,49 @@ static WiFiClient wifiClient;
 
 extern IotWebConf iotWebConf;
 
-
-class httpGroup : public iotwebconf::ChainedParameterGroup {
+class Relay : public iotwebconf::ChainedParameterGroup {
 public:
-    httpGroup(const char* id) : ChainedParameterGroup(id, "httpGroup") {
+    Relay(const char* id, const uint8_t gpio_) : ChainedParameterGroup(id, "Relay") {
+        // -- Update parameter Ids to have unique ID for all parameters within the application.
+        snprintf(Name_Id, STRING_LEN, "%s-name", this->getId());
+        snprintf(Power_Id, STRING_LEN, "%s-power", this->getId());
+        snprintf(gpio_Id, STRING_LEN, "%s-gpio", this->getId());
+
+        snprintf(Name_Default, STRING_LEN, "%s", this->getId());
+        snprintf(GPIO_Default, STRING_LEN, "%i", gpio_);
+
+        // -- Add parameters to this group.
+        this->addItem(&this->NameParam);
+        this->addItem(&this->powerParam);
+        this->addItem(&this->gpioParam);
+    }
+
+    char DesignationValue[STRING_LEN];
+    char PowerValue[NUMBER_LEN];
+    char GPIOValue[NUMBER_LEN];
+
+    iotwebconf::TextParameter NameParam = iotwebconf::TextParameter("Designation", Name_Id, DesignationValue, STRING_LEN, Name_Default);
+    iotwebconf::NumberParameter powerParam = iotwebconf::NumberParameter("Power (W)", Power_Id, PowerValue, NUMBER_LEN, "0", "0..10000", "min='0' max='10000' step='1'");
+    iotwebconf::NumberParameter gpioParam = iotwebconf::NumberParameter("GPIO", gpio_Id, GPIOValue, NUMBER_LEN, GPIO_Default, "0..255", "min='0' max='255' step='1'");
+
+    bool IsEnabled() { return Enabled; };
+    void SetEnabled(bool enabled_) { Enabled = enabled_; };
+    uint8_t GetGPIO() { return atoi(GPIOValue); };
+    uint32_t GetPower() { return atoi(PowerValue); };
+
+private:
+    char Name_Default[STRING_LEN];
+    char GPIO_Default[STRING_LEN];
+    char Name_Id[STRING_LEN];
+    char Power_Id[STRING_LEN];
+    char gpio_Id[STRING_LEN];
+
+    bool Enabled = false;
+};
+
+class Shelly : public iotwebconf::ChainedParameterGroup {
+public:
+    Shelly(const char* id) : ChainedParameterGroup(id, "Shelly") {
         // -- Update parameter Ids to have unique ID for all parameters within the application.
         snprintf(Name_Id, STRING_LEN, "%s-name", this->getId());
         snprintf(urlON_Id, STRING_LEN, "%s-urlon", this->getId());
@@ -79,6 +118,14 @@ public:
     iotwebconf::NumberParameter powerParam = iotwebconf::NumberParameter("Power (W)", Power_Id, PowerValue, NUMBER_LEN, "0", "0..10000", "min='0' max='10000' step='1'");
     iotwebconf::NumberParameter DelayParam = iotwebconf::NumberParameter("minimum on time (minutes)", Delay_Id, DelayValue, NUMBER_LEN, "0", "0..300", "min='0' max='300' step='1'");
 
+
+    uint32_t GetPower() { return atoi(PowerValue); };
+    uint32_t GetDelay() { return atoi(DelayValue); };
+    void SetEnabled(bool enabled_) { Enabled = enabled_; };
+    bool IsEnabled(){ return Enabled; };
+
+    Neotimer timer = Neotimer(1000);
+
 private:
     char Name_Default[STRING_LEN];
     char Name_Id[STRING_LEN];
@@ -86,9 +133,26 @@ private:
     char urlOFF_Id[STRING_LEN];
     char Power_Id[STRING_LEN];
     char Delay_Id[STRING_LEN];
+
+    bool Enabled = false;
+    
 };
 
+extern Relay Relay1;
+extern Relay Relay2;
+extern Relay Relay3;
+extern Relay Relay4;
 
+extern Shelly Shelly1;
+extern Shelly Shelly2;
+extern Shelly Shelly3;
+extern Shelly Shelly4;
+extern Shelly Shelly5;
+extern Shelly Shelly6;
+extern Shelly Shelly7;
+extern Shelly Shelly8;
+extern Shelly Shelly9;
+extern Shelly Shelly10;
 
 #endif
 

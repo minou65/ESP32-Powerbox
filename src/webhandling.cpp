@@ -26,7 +26,7 @@
 #include "webhandling.h"
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "A0"
+#define CONFIG_VERSION "A3"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -59,8 +59,6 @@ DNSServer dnsServer;
 WebServer server(80);
 
 
-Relay Relays[RelayMax];
-
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 
 IotWebConfParameterGroup sysConfGroup = IotWebConfParameterGroup("SysConf", "Inverter");
@@ -80,17 +78,17 @@ iotwebconf::UIntTParameter<uint16_t> InverterPort =
     placeholder("1..65535").
     build();
 
-iotwebconf::UIntTParameter<uint16_t> InverterActivePowerRegister =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("InverterActivePowerRegister").
-    label("Register Active Power").
-    defaultValue(37113).
+iotwebconf::UIntTParameter<uint16_t> InverterInputPowerRegister =
+    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("InverterInputPowerRegister").
+    label("Register Input power").
+    defaultValue(32064).
     min(1u).
     step(1).
     placeholder("1..65535").
     build();
 
-iotwebconf::UIntTParameter<uint8_t> InverterActivePowerDataLength =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("InverterActivePowerDataLength").
+iotwebconf::UIntTParameter<uint8_t> InverterInputPowerDataLength =
+    iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("InverterInputPowerDataLength").
     label("Data Length").
     defaultValue(2).
     min(1u).
@@ -98,8 +96,8 @@ iotwebconf::UIntTParameter<uint8_t> InverterActivePowerDataLength =
     placeholder("1..255").
     build();
 
-iotwebconf::UIntTParameter<uint16_t> InverterActivePowerGain =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("InverterActivePowerGain").
+iotwebconf::UIntTParameter<uint16_t> InverterInputPowerGain =
+    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("InverterInputPowerGain").
     label("Gain").
     defaultValue(1).
     min(1u).
@@ -117,121 +115,24 @@ iotwebconf::UIntTParameter<uint16_t> InverterActivePowerInterval =
     placeholder("10..255").
     build();
 
-IotWebConfParameterGroup Output1Group = IotWebConfParameterGroup("Output1", "Output 1");
 
-iotwebconf::TextTParameter<20> Output1Name =
-    iotwebconf::Builder<iotwebconf::TextTParameter<sizeof(gOutput1Name)>>("Output1Name").
-    label("Name").
-    defaultValue("Relay 1").
-    build();
-
-iotwebconf::UIntTParameter<uint8_t> Output1GPIO =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("Output1GPIO").
-    label("GPIO").
-    defaultValue(GPIO_NUM_1).
-    min(1u).
-    step(1).
-    placeholder("1..255").
-    build();
-
-iotwebconf::UIntTParameter<uint16_t> Output1Power =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("Output1Power").
-    label("Power (W)").
-    defaultValue(0).
-    min(0).
-    step(1).
-    placeholder("0..10000").
-    build();
-
-IotWebConfParameterGroup Output2Group = IotWebConfParameterGroup("Output2", "Output 2");
-
-iotwebconf::TextTParameter<20> Output2Name =
-    iotwebconf::Builder<iotwebconf::TextTParameter<sizeof(gOutput2Name)>>("Output2Name").
-    label("Name").
-    defaultValue("Relay 2").
-    build();
-
-iotwebconf::UIntTParameter<uint8_t> Output2GPIO =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("Output2GPIO").
-    label("GPIO").
-    defaultValue(GPIO_NUM_2).
-    min(1u).
-    step(1).
-    placeholder("1..255").
-    build();
-
-iotwebconf::UIntTParameter<uint16_t> Output2Power =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("Output2Power").
-    label("Power (W)").
-    defaultValue(0).
-    min(0).
-    step(1).
-    placeholder("1..10000").
-    build();
-
-IotWebConfParameterGroup Output3Group = IotWebConfParameterGroup("Output3", "Output 3");
-
-iotwebconf::TextTParameter<20> Output3Name =
-    iotwebconf::Builder<iotwebconf::TextTParameter<sizeof(gOutput3Name)>>("Output3Name").
-    label("Name").
-    defaultValue("Relay 3").
-    build();
-
-iotwebconf::UIntTParameter<uint8_t> Output3GPIO =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("Output3GPIO").
-    label("GPIO").
-    defaultValue(GPIO_NUM_3).
-    min(1u).
-    step(1).
-    placeholder("1..255").
-    build();
-
-iotwebconf::UIntTParameter<uint16_t> Output3Power =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("Output3Power").
-    label("Power (W)").
-    defaultValue(0).
-    min(0).
-    step(1).
-    placeholder("0..10000").
-    build();
-
-IotWebConfParameterGroup Output4Group = IotWebConfParameterGroup("Output4", "Output 4");
-
-iotwebconf::TextTParameter<20> Output4Name =
-    iotwebconf::Builder<iotwebconf::TextTParameter<sizeof(gOutput4Name)>>("Output4Name").
-    label("Name").
-    defaultValue("Relay 4").
-    build();
-
-iotwebconf::UIntTParameter<uint8_t> Output4GPIO =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("Output4GPIO").
-    label("GPIO").
-    defaultValue(GPIO_NUM_4).
-    min(1u).
-    step(1).
-    placeholder("1..255").
-    build();
-
-iotwebconf::UIntTParameter<uint16_t> Output4Power =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("Output4Power").
-    label("Power (W)").
-    defaultValue(0).
-    min(0).
-    step(1).
-    placeholder("1..10000").
-    build();
+Relay Relay1 = Relay("Relay1", GPIO_NUM_1);
+Relay Relay2 = Relay("Relay2", GPIO_NUM_2);
+Relay Relay3 = Relay("Relay3", GPIO_NUM_3);
+Relay Relay4 = Relay("Relay4", GPIO_NUM_4);
 
 
-httpGroup httpgroup0 = httpGroup("Shelly1");
-httpGroup httpgroup1 = httpGroup("Shelly2");
-httpGroup httpgroup2 = httpGroup("Shelly3");
-httpGroup httpgroup3 = httpGroup("Shelly4");
-httpGroup httpgroup4 = httpGroup("Shelly5");
-httpGroup httpgroup5 = httpGroup("Shelly6");
-httpGroup httpgroup6 = httpGroup("Shelly7");
-httpGroup httpgroup7 = httpGroup("Shelly8");
-httpGroup httpgroup8 = httpGroup("Shelly9");
-httpGroup httpgroup9 = httpGroup("Shelly10");
+Shelly Shelly1 = Shelly("Shelly1");
+Shelly Shelly2 = Shelly("Shelly2");
+Shelly Shelly3 = Shelly("Shelly3");
+Shelly Shelly4 = Shelly("Shelly4");
+Shelly Shelly5 = Shelly("Shelly5");
+Shelly Shelly6 = Shelly("Shelly6");
+Shelly Shelly7 = Shelly("Shelly7");
+Shelly Shelly8 = Shelly("Shelly8");
+Shelly Shelly9 = Shelly("Shelly9");
+Shelly Shelly10 = Shelly("Shelly10");
+
 
 iotwebconf::OptionalGroupHtmlFormatProvider optionalGroupHtmlFormatProvider;
 
@@ -246,55 +147,46 @@ void wifiInit() {
 
     iotWebConf.setHtmlFormatProvider(&optionalGroupHtmlFormatProvider);
 
-    httpgroup0.setNext(&httpgroup1);
-    httpgroup1.setNext(&httpgroup2);
-    httpgroup2.setNext(&httpgroup3);
-    httpgroup3.setNext(&httpgroup4);
-    httpgroup4.setNext(&httpgroup5);
-    httpgroup5.setNext(&httpgroup6);
-    httpgroup6.setNext(&httpgroup7);
-    httpgroup7.setNext(&httpgroup8);
-    httpgroup8.setNext(&httpgroup9);
+    Relay1.setNext(&Relay2);
+    Relay2.setNext(&Relay3);
+    Relay3.setNext(&Relay4);
+
+    Shelly1.setNext(&Shelly2);
+    Shelly2.setNext(&Shelly3);
+    Shelly3.setNext(&Shelly4);
+    Shelly4.setNext(&Shelly5);
+    Shelly5.setNext(&Shelly6);
+    Shelly6.setNext(&Shelly7);
+    Shelly7.setNext(&Shelly8);
+    Shelly8.setNext(&Shelly9);
+    Shelly10.setNext(&Shelly10);
 
     sysConfGroup.addItem(&InverterIPAddress);
     sysConfGroup.addItem(&InverterPort);
-    sysConfGroup.addItem(&InverterActivePowerRegister);
-    sysConfGroup.addItem(&InverterActivePowerDataLength);
-    sysConfGroup.addItem(&InverterActivePowerGain);
+    sysConfGroup.addItem(&InverterInputPowerRegister);
+    sysConfGroup.addItem(&InverterInputPowerDataLength);
+    sysConfGroup.addItem(&InverterInputPowerGain);
     sysConfGroup.addItem(&InverterActivePowerInterval);
 
-    Output1Group.addItem(&Output1Name);
-    Output1Group.addItem(&Output1GPIO);
-    Output1Group.addItem(&Output1Power);
-
-    Output2Group.addItem(&Output2Name);
-    Output2Group.addItem(&Output2GPIO);
-    Output2Group.addItem(&Output2Power);
-
-    Output3Group.addItem(&Output3Name);
-    Output3Group.addItem(&Output3GPIO);
-    Output3Group.addItem(&Output3Power);
-
-    Output4Group.addItem(&Output4Name);
-    Output4Group.addItem(&Output4GPIO);
-    Output4Group.addItem(&Output4Power);
-
     iotWebConf.addParameterGroup(&sysConfGroup);
-    iotWebConf.addParameterGroup(&Output1Group);
-    iotWebConf.addParameterGroup(&Output2Group);
-    iotWebConf.addParameterGroup(&Output3Group);
-    iotWebConf.addParameterGroup(&Output4Group);
 
-    iotWebConf.addParameterGroup(&httpgroup0);
-    iotWebConf.addParameterGroup(&httpgroup1);
-    iotWebConf.addParameterGroup(&httpgroup2);
-    iotWebConf.addParameterGroup(&httpgroup3);
-    iotWebConf.addParameterGroup(&httpgroup4);
-    iotWebConf.addParameterGroup(&httpgroup5);
-    iotWebConf.addParameterGroup(&httpgroup6);
-    iotWebConf.addParameterGroup(&httpgroup7);
-    iotWebConf.addParameterGroup(&httpgroup8);
-    iotWebConf.addParameterGroup(&httpgroup9);
+    iotWebConf.addParameterGroup(&Relay1);
+    iotWebConf.addParameterGroup(&Relay2);
+    iotWebConf.addParameterGroup(&Relay3);
+    iotWebConf.addParameterGroup(&Relay4);
+
+    Relay1.setActive(true);
+
+    iotWebConf.addParameterGroup(&Shelly1);
+    iotWebConf.addParameterGroup(&Shelly2);
+    iotWebConf.addParameterGroup(&Shelly3);
+    iotWebConf.addParameterGroup(&Shelly4);
+    iotWebConf.addParameterGroup(&Shelly5);
+    iotWebConf.addParameterGroup(&Shelly6);
+    iotWebConf.addParameterGroup(&Shelly7);
+    iotWebConf.addParameterGroup(&Shelly8);
+    iotWebConf.addParameterGroup(&Shelly9);
+    iotWebConf.addParameterGroup(&Shelly10);
 
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
@@ -354,49 +246,28 @@ void handleRoot() {
     page += HTML_Fieldset_Legend;
     page.replace("{l}", "Power");
         page += HTML_Start_Table;
-
-        page += "<tr><td align=left>Active:</td><td>" + String(gActivePower) + "W" + "</td></tr>";
-        page += "<tr><td align=left>Intervall:</td><td>" + String(gInverterActivePowerInterval) + "s" + "</td></tr>";
+        page += "<tr><td align=left>Input power:</td><td>" + String(gInputPower) + "W" + "</td></tr>";
+        page += "<tr><td align=left>Intervall  :</td><td>" + String(gInverterInterval) + "s" + "</td></tr>";
 
         page += HTML_End_Table;
     page += HTML_End_Fieldset;
 
     page += HTML_Start_Fieldset;
     page += HTML_Fieldset_Legend;
-    page.replace("{l}", "Status");
+    page.replace("{l}", "Relays");
     page += HTML_Start_Table;
 
-    name = gOutput1Name;
-    if (gRelay1) {
-        page += "<tr><td align=left>" + name + ":</td><td><span class = \"dot-green\"></span></td></tr>";
-    }
-    else {
-        page += "<tr><td align=left>" + name + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
-    }
-        
-    name = gOutput2Name;
-    if (gRelay2) {
-        page += "<tr><td align=left>" + name + ":</td><td><span class = \"dot-green\"></span></td></tr>";
-    }
-    else {
-        page += "<tr><td align=left>" + name + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
-    }
-
-    name = gOutput3Name;
-    if (gRelay3) {
-        page += "<tr><td align=left>" + name + ":</td><td><span class = \"dot-green\"></span></td></tr>";
-    }
-    else {
-        page += "<tr><td align=left>" + name + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
-    }
-
-
-    name = gOutput4Name;
-    if (gRelay4) {
-        page += "<tr><td align=left>" + name + ":</td><td><span class = \"dot-green\"></span></td></tr>";
-    }
-    else {
-        page += "<tr><td align=left>" + name + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
+    Relay* _relay = &Relay1;
+    while (_relay != nullptr) {
+        if (_relay->isActive()) {
+            if (_relay->IsEnabled()) {
+                page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
+            }
+            else {
+                page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
+            }
+        }
+        _relay = (Relay*)_relay->getNext();
     }
 
     page += HTML_End_Table;
@@ -407,20 +278,25 @@ void handleRoot() {
     page.replace("{l}", "Shellys");
     page += HTML_Start_Table;
 
-    for (uint8_t _i = 0; _i < ShellyMax; _i++){
-        if (Shellys[_i].Power > 0) {
-            if ((Shellys[_i].Enabled == true) && (gActivePower > Shellys[_i].Power)) {
-                page += "<tr><td align=left>" + String(Shellys[_i].Name) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
+    Shelly* _shelly = &Shelly1;
+    bool _enabled = false;
+    uint8_t i = 1;
+    while (_shelly != nullptr) {
+        if (_shelly->isActive()) {
+            if (_shelly->IsEnabled() && (gInputPower > _shelly->GetPower())) {
+                page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
             }
-            else if ((Shellys[_i].Enabled == true) && (gActivePower <= Shellys[_i].Power)) {
-                page += "<tr><td align=left>" + String(Shellys[_i].Name) + ":</td><td><span class = \"blink-green\"></span></td></tr>";
+            else  if (_shelly->IsEnabled() && (gInputPower <= _shelly->GetPower())) {
+                page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span class = \"blink-green\"></span></td></tr>";
             }
             else {
-                page += "<tr><td align=left>" + String(Shellys[_i].Name) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
+                page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
             }
-        }
-    }
 
+        }
+        _shelly = (Shelly*)_shelly->getNext();
+        i++;
+    }
 
     page += HTML_End_Table;
     page += HTML_End_Fieldset;
@@ -452,56 +328,12 @@ void handleRoot() {
 }
 
 void convertParams() {
-
-    strcpy(gOutput1Name, Output1Name.value());
-    gOutput1Power = Output1Power.value();
-    gOutput1GPIO = Output1GPIO.value();
-
-    strcpy(gOutput2Name, Output2Name.value());
-    gOutput2Power = Output2Power.value();
-    gOutput2GPIO = Output2GPIO.value();
-
-    strcpy(gOutput3Name, Output3Name.value());
-    gOutput3Power = Output3Power.value();
-    gOutput3GPIO = Output3GPIO.value();
-
-    strcpy(gOutput4Name, Output4Name.value());
-    gOutput4Power = Output4Power.value();
-    gOutput4GPIO = Output4GPIO.value();
-
     strcpy(gInverterIPAddress, InverterIPAddress.value());
     gInverterPort = InverterPort.value();
-    gInverterActivePowerRegister = InverterActivePowerRegister.value();
-    gInverterActivePowerDataLength = InverterActivePowerDataLength.value();
-    gInverterActivePowerGain = InverterActivePowerGain.value();
-    gInverterActivePowerInterval = InverterActivePowerInterval.value();
-
-    httpGroup* _httpgroup = &httpgroup0;
-    uint8_t _i = 0;
-    while (_httpgroup != nullptr) {
-        if (_httpgroup->isActive()) {
-            strcpy(Shellys[_i].Name, _httpgroup->DesignationValue);
-            strcpy(Shellys[_i].url_On, _httpgroup->url_OnValue);
-            strcpy(Shellys[_i].url_Off, _httpgroup->url_OffValue);
-            Shellys[_i].Delay = atoi(_httpgroup->DelayValue);
-            Shellys[_i].Power = atoi(_httpgroup->PowerValue);
-            Shellys[_i].timer.start(Shellys[_i].Delay * 1000 * 60);
-        }
-        else {
-            strcpy(Shellys[_i].Name, "Shelly");
-            strcpy(Shellys[_i].url_On, "http://");
-            strcpy(Shellys[_i].url_Off, "http://");
-            Shellys[_i].Enabled = false;
-            Shellys[_i].Delay = 0;
-            Shellys[_i].Power = 0;
-            Shellys[_i].timer.start(1000);
-        }
-
-        _httpgroup = (httpGroup*)_httpgroup->getNext();
-        _i++;
-
-    }
-
+    gInverterInputPowerRegister = InverterInputPowerRegister.value();
+    gInverterInputPowerDataLength = InverterInputPowerDataLength.value();
+    gInverterInputPowerGain = InverterInputPowerGain.value();
+    gInverterInterval = InverterActivePowerInterval.value();
 }
 
 void configSaved() {

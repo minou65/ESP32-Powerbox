@@ -11,14 +11,14 @@
 #include "webhandling.h"
 #include <ModbusClientTCP.h>
 
-int gActivePower = 0;
-uint8_t gInverterActivePowerInterval = 10;
+int gInputPower = 0;
+uint8_t gInverterInterval = 10;
 
 char gInverterIPAddress[15] = "0.0.0.0";
 int gInverterPort = 502;
-uint16_t gInverterActivePowerRegister = 37113;
-uint8_t gInverterActivePowerDataLength = 2;
-uint16_t gInverterActivePowerGain = 1;
+uint16_t gInverterInputPowerRegister = 32064;
+uint8_t gInverterInputPowerDataLength = 2;
+uint16_t gInverterInputPowerGain = 1;
 
 // W5500 reset pin 
 #define RESET_P GPIO_NUM_26
@@ -28,7 +28,7 @@ IPAddress gserver(192, 168, 1, 10); // update with the IP Address of your Modbus
 byte mac[] = { 0x30, 0x2B, 0x2D, 0x2F, 0x61, 0xE2 }; // MAC address (fill your own data here!)
 IPAddress lIP;                      // IP address after Ethernet.begin()
 ModbusClientTCP ModbusClient(wifiClient);
-Neotimer InverterInterval = Neotimer(gInverterActivePowerInterval * 1000);
+Neotimer InverterInterval = Neotimer(gInverterInterval * 1000);
 
 void handleData(ModbusMessage response, uint32_t token)
 {
@@ -43,13 +43,13 @@ void handleData(ModbusMessage response, uint32_t token)
         (unsigned char)(response[5]) << 8 |
         (unsigned char)(response[6]));
 
-    a = a / gInverterActivePowerGain;
+    a = a / gInverterInputPowerGain;
 
     Serial.print(a);
     Serial.println("W");
     Serial.println("");
 
-    gActivePower = a;
+    gInputPower = a;
 }
 
 void handleError(Error error, uint32_t token)
@@ -69,17 +69,15 @@ void InverterSetup() {
     ModbusClient.setTimeout(2000, 200);
     ModbusClient.begin();
 
-    gActivePower = 0;
-
 }
 
 void InverterLoop() {
     if (gParamsChanged) {
-        InverterInterval.start(gInverterActivePowerInterval * 1000);
+        InverterInterval.start(gInverterInterval * 1000);
     }
 
     if (InverterInterval.repeat()) {
-        InverterRequest(gInverterIPAddress, gInverterPort, gInverterActivePowerRegister, gInverterActivePowerDataLength);
+        InverterRequest(gInverterIPAddress, gInverterPort, gInverterInputPowerRegister, gInverterInputPowerDataLength);
     }
 }
 
