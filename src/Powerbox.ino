@@ -43,5 +43,10 @@ void loop() {
 		// ShellyDisableAll();
 	}
 
+	if (gParamsChanged) {
+		RelaySetup();
+		InverterSetup();
+	}
+
 	gParamsChanged = false;
 }
