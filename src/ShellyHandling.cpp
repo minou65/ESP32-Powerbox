@@ -6,7 +6,7 @@
 #include <HTTPClient.h>
 #include "common.h"
 #include "webhandling.h"
-
+#include "ESP32Time.h"
 
 HTTPClient http;
 
@@ -35,10 +35,12 @@ void ShellySetup() {};
 void ShellyLoop() {
     Shelly* _shelly = &Shelly1;
     bool _enabled = false;
+    ESP32Time rtc;
+
     uint8_t i = 1;
     while (_shelly != nullptr) {
         if (_shelly->isActive()) {
-            _enabled = gInputPower > _shelly->GetPower();
+            _enabled = (gInputPower > _shelly->GetPower()) && (rtc.getTime() > _shelly->TimeValue);
 
             if (_enabled) {
 

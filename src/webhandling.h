@@ -93,6 +93,7 @@ public:
         snprintf(urlOFF_Id, STRING_LEN, "%s-urloff", this->getId());
         snprintf(Power_Id, STRING_LEN, "%s-power", this->getId());
         snprintf(Delay_Id, STRING_LEN, "%s-delay", this->getId());
+        nprintf(Time_Id, STRING_LEN, "%s-time", this->getId());
 
         snprintf(Name_Default, STRING_LEN, "%s", this->getId());
 
@@ -102,18 +103,14 @@ public:
         this->addItem(&this->urlOFFParam);
         this->addItem(&this->powerParam);
         this->addItem(&this->DelayParam);
+        this->addItem(&this->TimeParam);
+
     };
 
     char DesignationValue[STRING_LEN];
     char url_OnValue[STRING_LEN];
     char url_OffValue[STRING_LEN];
-
-    iotwebconf::TextParameter NameParam = iotwebconf::TextParameter("Designation", Name_Id, DesignationValue, STRING_LEN, Name_Default);
-    iotwebconf::TextParameter urlONParam = iotwebconf::TextParameter("URL on", urlON_Id, url_OnValue, STRING_LEN, "http://");
-    iotwebconf::TextParameter urlOFFParam = iotwebconf::TextParameter("URL off", urlOFF_Id, url_OffValue, STRING_LEN, "http://");
-    iotwebconf::NumberParameter powerParam = iotwebconf::NumberParameter("Power (W)", Power_Id, PowerValue, NUMBER_LEN, "0", "0..10000", "min='0' max='10000' step='1'");
-    iotwebconf::NumberParameter DelayParam = iotwebconf::NumberParameter("Power-off delay (minutes)", Delay_Id, DelayValue, NUMBER_LEN, "0", "0..300", "min='0' max='300' step='1'");
-
+    char TimeValue[STRING_LEN];
 
     uint32_t GetPower() { return atoi(PowerValue); };
     uint32_t GetDelay() { return atoi(DelayValue); };
@@ -123,12 +120,20 @@ public:
     Neotimer timer = Neotimer(1000);
 
 private:
+    iotwebconf::TextParameter NameParam = iotwebconf::TextParameter("Designation", Name_Id, DesignationValue, STRING_LEN, Name_Default);
+    iotwebconf::TextParameter urlONParam = iotwebconf::TextParameter("URL on", urlON_Id, url_OnValue, STRING_LEN, "http://");
+    iotwebconf::TextParameter urlOFFParam = iotwebconf::TextParameter("URL off", urlOFF_Id, url_OffValue, STRING_LEN, "http://");
+    iotwebconf::NumberParameter powerParam = iotwebconf::NumberParameter("Power (W)", Power_Id, PowerValue, NUMBER_LEN, "0", "0..10000", "min='0' max='10000' step='1'");
+    iotwebconf::NumberParameter DelayParam = iotwebconf::NumberParameter("Power-off delay (minutes)", Delay_Id, DelayValue, NUMBER_LEN, "0", "0..300", "min='0' max='300' step='1'");
+    iotwebconf::TimeParameter TimeParam = iotwebconf::TimeParameter("Do not enable befor", Time_Id, TimeValue, STRING_LEN, "00:00");
+
     char Name_Default[STRING_LEN];
     char Name_Id[STRING_LEN];
     char urlON_Id[STRING_LEN];
     char urlOFF_Id[STRING_LEN];
     char Power_Id[STRING_LEN];
     char Delay_Id[STRING_LEN];
+    char Time_Id[STRING_LEN];
 
     bool Enabled = false;
 
