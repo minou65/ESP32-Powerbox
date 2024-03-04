@@ -107,10 +107,6 @@ public:
     char DesignationValue[STRING_LEN];
     char url_OnValue[STRING_LEN];
     char url_OffValue[STRING_LEN];
-    char PowerValue[NUMBER_LEN];
-    char DelayValue[NUMBER_LEN];
-
-
 
     iotwebconf::TextParameter NameParam = iotwebconf::TextParameter("Designation", Name_Id, DesignationValue, STRING_LEN, Name_Default);
     iotwebconf::TextParameter urlONParam = iotwebconf::TextParameter("URL on", urlON_Id, url_OnValue, STRING_LEN, "http://");
@@ -135,6 +131,9 @@ private:
     char Delay_Id[STRING_LEN];
 
     bool Enabled = false;
+
+    char PowerValue[NUMBER_LEN];
+    char DelayValue[NUMBER_LEN];
     
 };
 
