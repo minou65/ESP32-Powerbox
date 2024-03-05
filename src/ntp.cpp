@@ -8,7 +8,7 @@
 
 #define NTPUpdatePeriode 43200000 // 12h
 
-String gNTPServer = "pool.ntp.org";
+String gNTPServer = "ntp.metas.ch"; // "pool.ntp.org";
 String gTimeZone = "CET-1CEST,M3.5.0,M10.5.0/3";
 int32_t gTimeOffset_sec = 0;
 
@@ -32,11 +32,12 @@ void NTPloop() {
 
         struct tm timeinfo;
         if (getLocalTime(&timeinfo)) {
-            rtc.setTimeStruct(timeinfo);
+            //rtc.setTimeStruct(timeinfo);
             NTPSync = false;
             Serial.println(F("NTP time successfull set"));
-            
-            NTPSync = false;
+            char s[51];
+            strftime(s, 50, "%A, %B %d %Y %H:%M:%S", &timeinfo);
+            Serial.println(s);
         }
     }
 }

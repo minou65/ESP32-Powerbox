@@ -33,6 +33,7 @@ void setup() {
 void loop() {
 	wifiLoop();
 	if (iotWebConf.getState() == iotwebconf::OnLine) {
+
 		InverterLoop();
 		RelayLoop();
         ShellyLoop();

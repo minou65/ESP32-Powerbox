@@ -10,6 +10,8 @@
 
 HTTPClient http;
 
+Neotimer ShellyIntervall = Neotimer(30000);
+
 
 void httpget(String URL_) {
 
@@ -30,17 +32,26 @@ void httpget(String URL_) {
     http.end();
 }
 
-void ShellySetup() {};
+void ShellySetup() {
+    ShellyIntervall.start();
+};
 
 void ShellyLoop() {
+
+    if (!ShellyIntervall.repeat()) { return; }
+
     Shelly* _shelly = &Shelly1;
     bool _enabled = false;
     ESP32Time rtc;
 
+    String _time = rtc.getTime("%H:%M");
+    Serial.println(_time);
+
     uint8_t i = 1;
     while (_shelly != nullptr) {
         if (_shelly->isActive()) {
-            _enabled = (gInputPower > _shelly->GetPower()) && (rtc.getTime() > _shelly->TimeValue);
+
+            _enabled = (gInputPower > _shelly->GetPower()) && (_time > String(_shelly->TimeValue));
 
             if (_enabled) {
 
