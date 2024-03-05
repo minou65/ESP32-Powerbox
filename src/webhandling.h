@@ -44,9 +44,9 @@ static WiFiClient wifiClient;
 
 extern IotWebConf iotWebConf;
 
-class Relay : public iotwebconf::ChainedParameterGroup {
+class Relay : public iotwebconf::ParameterGroup {
 public:
-    Relay(const char* id, const uint8_t gpio_) : ChainedParameterGroup(id, "Relay") {
+    Relay(const char* id, const uint8_t gpio_) : ParameterGroup(id, "Relay") {
         // -- Update parameter Ids to have unique ID for all parameters within the application.
         snprintf(Name_Id, STRING_LEN, "%s-name", this->getId());
         snprintf(Power_Id, STRING_LEN, "%s-power", this->getId());
@@ -62,19 +62,28 @@ public:
     }
 
     char DesignationValue[STRING_LEN];
-    char PowerValue[NUMBER_LEN];
-    char GPIOValue[NUMBER_LEN];
-
-    iotwebconf::TextParameter NameParam = iotwebconf::TextParameter("Designation", Name_Id, DesignationValue, STRING_LEN, Name_Default);
-    iotwebconf::NumberParameter powerParam = iotwebconf::NumberParameter("Power (W)", Power_Id, PowerValue, NUMBER_LEN, "0", "0..10000", "min='0' max='10000' step='1'");
-    iotwebconf::NumberParameter gpioParam = iotwebconf::NumberParameter("GPIO", gpio_Id, GPIOValue, NUMBER_LEN, GPIO_Default, "0..255", "min='0' max='255' step='1'");
 
     bool IsEnabled() { return Enabled; };
     void SetEnabled(bool enabled_) { Enabled = enabled_; };
     uint8_t GetGPIO() { return atoi(GPIOValue); };
     uint32_t GetPower() { return atoi(PowerValue); };
 
+    void setNext(Relay* nextGroup) { this->nextGroup = nextGroup; nextGroup->prevGroup = this; };
+    Relay* getNext() { return this->nextGroup; };
+
+protected:
+    Relay* prevGroup = nullptr;
+    Relay* nextGroup = nullptr;
+
 private:
+
+    iotwebconf::TextParameter NameParam = iotwebconf::TextParameter("Designation", Name_Id, DesignationValue, STRING_LEN, Name_Default);
+    iotwebconf::NumberParameter powerParam = iotwebconf::NumberParameter("Power (W)", Power_Id, PowerValue, NUMBER_LEN, "0", "0..10000", "min='0' max='10000' step='1'");
+    iotwebconf::NumberParameter gpioParam = iotwebconf::NumberParameter("GPIO", gpio_Id, GPIOValue, NUMBER_LEN, GPIO_Default, "0..255", "min='0' max='255' step='1'");
+
+    char PowerValue[NUMBER_LEN];
+    char GPIOValue[NUMBER_LEN];
+
     char Name_Default[STRING_LEN];
     char GPIO_Default[STRING_LEN];
     char Name_Id[STRING_LEN];
@@ -93,7 +102,7 @@ public:
         snprintf(urlOFF_Id, STRING_LEN, "%s-urloff", this->getId());
         snprintf(Power_Id, STRING_LEN, "%s-power", this->getId());
         snprintf(Delay_Id, STRING_LEN, "%s-delay", this->getId());
-        nprintf(Time_Id, STRING_LEN, "%s-time", this->getId());
+        snprintf(Time_Id, STRING_LEN, "%s-time", this->getId());
 
         snprintf(Name_Default, STRING_LEN, "%s", this->getId());
 
@@ -125,7 +134,7 @@ private:
     iotwebconf::TextParameter urlOFFParam = iotwebconf::TextParameter("URL off", urlOFF_Id, url_OffValue, STRING_LEN, "http://");
     iotwebconf::NumberParameter powerParam = iotwebconf::NumberParameter("Power (W)", Power_Id, PowerValue, NUMBER_LEN, "0", "0..10000", "min='0' max='10000' step='1'");
     iotwebconf::NumberParameter DelayParam = iotwebconf::NumberParameter("Power-off delay (minutes)", Delay_Id, DelayValue, NUMBER_LEN, "0", "0..300", "min='0' max='300' step='1'");
-    iotwebconf::TimeParameter TimeParam = iotwebconf::TimeParameter("Do not enable befor", Time_Id, TimeValue, STRING_LEN, "00:00");
+    iotwebconf::TimeParameter TimeParam = iotwebconf::TimeParameter("Do not enable before ", Time_Id, TimeValue, STRING_LEN, "00:00");
 
     char Name_Default[STRING_LEN];
     char Name_Id[STRING_LEN];

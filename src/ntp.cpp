@@ -35,6 +35,8 @@ void NTPloop() {
             rtc.setTimeStruct(timeinfo);
             NTPSync = false;
             Serial.println(F("NTP time successfull set"));
+            
+            NTPSync = false;
         }
     }
 }

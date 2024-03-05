@@ -13,7 +13,7 @@
 #endif
 
 #include <time.h>
-//needed for library
+#include "ESP32Time.h"
 
 #include <DNSServer.h>
 #include<iostream>
@@ -117,11 +117,19 @@ iotwebconf::UIntTParameter<uint16_t> InverterActivePowerInterval =
     placeholder("10..255").
     build();
 
+char vUseNTPServer[STRING_LEN];
+char vNTPServer[STRING_LEN];
+char vTimeZone[STRING_LEN];
+iotwebconf::ParameterGroup TimeSourceGroup = iotwebconf::ParameterGroup("TimeSourceGroup", "Time Source");
+iotwebconf::CheckboxParameter cUseNTPServer = iotwebconf::CheckboxParameter("Use NTP server", "UseNTPServerParam", vUseNTPServer, STRING_LEN, true);
+iotwebconf::TextParameter cNTPServerAddress = iotwebconf::TextParameter("NTP server (FQDN or IP address)", "NTPServerParam", vNTPServer, STRING_LEN, "pool.ntp.org");
+iotwebconf::TextParameter cgmtOffset_sec = iotwebconf::TextParameter("POSIX timezones string", "TimeOffsetParam", vTimeZone, STRING_LEN, "CET-1CEST,M3.5.0,M10.5.0/3");
 
-Relay Relay1 = Relay("Relay1", GPIO_NUM_1);
-Relay Relay2 = Relay("Relay2", GPIO_NUM_2);
-Relay Relay3 = Relay("Relay3", GPIO_NUM_3);
-Relay Relay4 = Relay("Relay4", GPIO_NUM_4);
+
+Relay Relay1 = Relay("Relay1", GPIO_NUM_22);
+Relay Relay2 = Relay("Relay2", GPIO_NUM_21);
+Relay Relay3 = Relay("Relay3", GPIO_NUM_17);
+Relay Relay4 = Relay("Relay4", GPIO_NUM_16);
 
 
 Shelly Shelly1 = Shelly("Shelly1");
@@ -172,12 +180,16 @@ void wifiInit() {
 
     iotWebConf.addParameterGroup(&sysConfGroup);
 
+    TimeSourceGroup.addItem(&cUseNTPServer);
+    TimeSourceGroup.addItem(&cNTPServerAddress);
+    TimeSourceGroup.addItem(&cgmtOffset_sec);
+
+    iotWebConf.addParameterGroup(&TimeSourceGroup);
+
     iotWebConf.addParameterGroup(&Relay1);
     iotWebConf.addParameterGroup(&Relay2);
     iotWebConf.addParameterGroup(&Relay3);
     iotWebConf.addParameterGroup(&Relay4);
-
-    Relay1.setActive(true);
 
     iotWebConf.addParameterGroup(&Shelly1);
     iotWebConf.addParameterGroup(&Shelly2);
@@ -225,6 +237,7 @@ void handleFavIcon() {
 
 void handleRoot() {
     String name;
+    ESP32Time rtc;
 
     // -- Let IotWebConf test and handle captive portal requests.
     if (iotWebConf.handleCaptivePortal())
@@ -266,14 +279,13 @@ void handleRoot() {
 
     Relay* _relay = &Relay1;
     while (_relay != nullptr) {
-        if (_relay->isActive()) {
-            if (_relay->IsEnabled()) {
-                page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
-            }
-            else {
-                page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
-            }
+        if (_relay->IsEnabled()) {
+            page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
         }
+        else {
+            page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
+        }
+
         _relay = (Relay*)_relay->getNext();
     }
 
@@ -323,6 +335,7 @@ void handleRoot() {
     page += "<br>";
 
     page += HTML_Start_Table;
+    page += "<tr><td align=left>Time:</td><td>" + rtc.getDateTime() + "</td></tr>";
     page += "<tr><td align=left>Go to <a href = 'config'>configure page</a> to change configuration.</td></tr>";
     // page += "<tr><td align=left>Go to <a href='setruntime'>runtime modification page</a> to change runtime data.</td></tr>";
     page += HTML_End_Table;

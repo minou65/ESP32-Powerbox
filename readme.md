@@ -23,6 +23,7 @@
       - [URL on](#url-on)
       - [URL off](#url-off)
       - [minimum on time (minutes)](#minimum-on-time-minutes)
+      - [Do not enable before](#do-not-enable-before)
     - [WiFi](#wifi)
       - [Default Password](#default-password)
       - [Default IP address](#default-ip-address)
@@ -86,6 +87,9 @@ URL to turn off Shelly
 
 #### minimum on time (minutes)
 Switch-off delay when the power falls below the power setting
+
+#### Do not enable before
+Here you can define a time. The Shelly will not be switched on before this time
 
 ### WiFi
 
