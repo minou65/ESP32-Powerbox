@@ -1,7 +1,3 @@
-// 
-// 
-// 
-
 #include "ShellyHandling.h"
 #include <HTTPClient.h>
 #include "common.h"
