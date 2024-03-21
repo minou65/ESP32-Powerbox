@@ -22,6 +22,7 @@
 #include <IotWebConf.h>
 #include <IotWebConfUsing.h> // This loads aliases for easier class names.
 #include <IotWebConfTParameter.h>
+# include <IotWebConfESP32HTTPUpdateServer.h>
 #include "common.h"
 #include "webhandling.h"
 #include "favicon.h"
@@ -49,6 +50,7 @@ const char thingName[] = "PowerBox";
 // -- Method declarations.
 void handleRoot();
 void handleFavIcon();
+void handleReboot();
 void convertParams();
 
 // -- Callback methods.
@@ -143,6 +145,7 @@ Shelly Shelly8 = Shelly("Shelly8");
 Shelly Shelly9 = Shelly("Shelly9");
 Shelly Shelly10 = Shelly("Shelly10");
 
+HTTPUpdateServer httpUpdater;
 
 iotwebconf::OptionalGroupHtmlFormatProvider optionalGroupHtmlFormatProvider;
 
@@ -202,6 +205,11 @@ void wifiInit() {
     iotWebConf.addParameterGroup(&Shelly9);
     iotWebConf.addParameterGroup(&Shelly10);
 
+    // -- Define how to handle updateServer calls.
+    iotWebConf.setupUpdateServer(
+        [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
+        [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
+
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
 
@@ -216,6 +224,7 @@ void wifiInit() {
     server.on("/", handleRoot);
     server.on("/favicon.ico", [] { handleFavIcon(); });
     server.on("/config", [] { iotWebConf.handleConfig(); });
+    server.on("/reboot", HTTP_GET, []() { handleReboot(); });
     server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
     Serial.println("Ready.");
@@ -233,6 +242,19 @@ void wifiConnected(){
 
 void handleFavIcon() {
    server.send_P(200, "image/x-icon", favicon, sizeof(favicon));
+}
+
+void handleReboot() {
+    String _message;
+
+    // redirect to the root page after 15 seconds
+    _message += "<HEAD><meta http-equiv=\"refresh\" content=\"15;url=/\"></HEAD>\n<BODY><p>\n";
+    _message += "Rebooting...<br>\n";
+    _message += "Redirected after 15 seconds...\n";
+    _message += "</p></BODY>\n";
+
+    server.send(200, "text/html", _message);
+    ESP.restart();
 }
 
 void handleRoot() {
@@ -340,6 +362,9 @@ void handleRoot() {
     // page += "<tr><td align=left>Go to <a href='setruntime'>runtime modification page</a> to change runtime data.</td></tr>";
     page += HTML_End_Table;
     page += HTML_End_Body;
+
+    // add a button to trigger a reboot
+    page += "<form action='/reboot' method='get'><button type='submit'>Reboot</button></form>";
 
     page += HTML_End_Doc;
 
