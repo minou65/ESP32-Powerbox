@@ -33,9 +33,12 @@
   - [Reset](#reset)
 
 ## Desription
+The PVPowerbox allows loads to be switched on or off depending on the power available from the photovoltaics. In the picture you can see how the loads (red) are switched on and off, depending on the power (green) that is available. The regular peaks are from the heat pump, which is not controlled via the PVPowerbox
+
+![alt text](img/20240318_160704000_iOS.png)
 
 ## Librarys
-[ModbusClientTCP](https://github.com/eModbus/eModbus)
+[ModbusClientTCP](https://github.com/eModbus/eModbus)</br>
 [AsyncTCP](https://github.com/dvarrel/AsyncTCP)
 
 ## Settings
@@ -67,10 +70,10 @@ What power from the photovoltaic system is necessary for the output to be activa
 
 #### GPIO
 Default GPIO's are 
-- Relay 1 = 1
-- Relay 2 = 2
-- Relay 3 = 3
-- Relay 4 = 4
+- Relay 1 = 22
+- Relay 2 = 21
+- Relay 3 = 17
+- Relay 4 = 16
 
 ### Shelly
 #### Designation
