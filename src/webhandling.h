@@ -67,11 +67,31 @@
 	}\n \
 \n \
     function updateData(jsonData) { \n \
+		document.getElementById('PowerValue').innerHTML = jsonData.Power;\n \
         document.getElementById('relay1').innerHTML = jsonData.Relays.relay1;\n \
         document.getElementById('relay2').innerHTML = jsonData.Relays.relay2;\n \
 		document.getElementById('relay3').innerHTML = jsonData.Relays.relay3;\n \
 		document.getElementById('relay4').innerHTML = jsonData.Relays.relay4;\n \
-        document.getElementById('PowerValue').innerHTML = jsonData.Power;\n \
+		const shelly1element = document.getElementById('shelly1'); \n \
+		if (shelly1element) { shelly1element.innerHTML = jsonData.Shellys.shelly1; }\n \
+		const shelly2element = document.getElementById('shelly2'); \n \
+		if (shelly2element) { shelly2element.innerHTML = jsonData.Shellys.shelly2; }\n \
+		const shelly3element = document.getElementById('shelly3'); \n \
+		if (shelly3element) { shelly3element.innerHTML = jsonData.Shellys.shelly3; }\n \
+		const shelly4element = document.getElementById('shelly4'); \n \
+		if (shelly4element) { shelly4element.innerHTML = jsonData.Shellys.shelly4; }\n \
+		const shelly5element = document.getElementById('shelly5'); \n \
+		if (shelly5element) { shelly5element.innerHTML = jsonData.Shellys.shelly5; }\n \
+		const shelly6element = document.getElementById('shelly6'); \n \
+		if (shelly6element) { shelly6element.innerHTML = jsonData.Shellys.shelly6; }\n \
+		const shelly7element = document.getElementById('shelly7'); \n \
+		if (shelly7element) { shelly7element.innerHTML = jsonData.Shellys.shelly7; }\n \
+		const shelly8element = document.getElementById('shelly8'); \n \
+		if (shelly8element) { shelly8element.innerHTML = jsonData.Shellys.shelly8; }\n \
+		const shelly9element = document.getElementById('shelly9'); \n \
+		if (shelly9element) { shelly9element.innerHTML = jsonData.Shellys.shelly9; }\n \
+		const shelly10element = document.getElementById('shelly10'); \n \
+		if (shelly10element) { shelly10element.innerHTML = jsonData.Shellys.shelly10; }\n \
     }\n \
 </script>\
 ";
