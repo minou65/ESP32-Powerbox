@@ -68,7 +68,10 @@ WebServer server(80);
 class CustomHtmlFormatProvider : public iotwebconf::OptionalGroupHtmlFormatProvider {
 protected:
     virtual String getFormEnd() {
-		return OptionalGroupHtmlFormatProvider::getFormEnd() + "</br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>";
+        String _s = OptionalGroupHtmlFormatProvider::getFormEnd();
+        _s += F("</br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>");
+        _s += F("</br>Return to <a href='/'>home page</a>.");
+		return _s;
 	}
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
