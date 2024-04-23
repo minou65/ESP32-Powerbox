@@ -33,6 +33,48 @@
 #define HTML_End_Doc "</html>";
 #define HTML_Fieldset_Legend "<legend>{l}</legend>"
 #define HTML_Table_Row "<tr><td>{n}</td><td>{v}</td></tr>";
+#define HTML_script \
+"<script>\n \
+    // get intial data straight away \n \
+    requestDateTime(); \n \
+    requestData(); \n \
+\n \
+    // request data updates every milliseconds\n \
+    setInterval(requestDateTime, 1000);\n \
+    setInterval(requestData, 5000);\n \
+\n \
+	function requestDateTime() {\n \
+        var xhttp = new XMLHttpRequest();\n \
+        xhttp.onreadystatechange = function() {\n \
+            if (this.readyState == 4 && this.status == 200) {\n \
+                document.getElementById('DateTimeValue').innerHTML = this.responseText;\n \
+            }\n \
+        };\n \
+        xhttp.open('GET', 'DateTime', true);\n \
+        xhttp.send();\n \
+	}\n \
+\n \
+    function requestData() {\n \
+		var xhttp = new XMLHttpRequest();\n \
+		xhttp.onreadystatechange = function() {\n \
+			if (this.readyState == 4 && this.status == 200) {\n \
+				var json = JSON.parse(this.responseText);\n \
+				updateData(json);\n \
+			}\n \
+		};\n \
+        xhttp.open('GET', 'data', true);\n \
+		xhttp.send();\n \
+	}\n \
+\n \
+    function updateData(jsonData) { \n \
+        document.getElementById('relay1').innerHTML = jsonData.Relays.relay1;\n \
+        document.getElementById('relay2').innerHTML = jsonData.Relays.relay2;\n \
+		document.getElementById('relay3').innerHTML = jsonData.Relays.relay3;\n \
+		document.getElementById('relay4').innerHTML = jsonData.Relays.relay4;\n \
+        document.getElementById('PowerValue').innerHTML = jsonData.Power;\n \
+    }\n \
+</script>\
+";
 
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
 const char wifiInitialApPassword[] = "123456789";

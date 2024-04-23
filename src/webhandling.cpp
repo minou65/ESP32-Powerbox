@@ -50,6 +50,9 @@ const char thingName[] = "PowerBox";
 // -- Method declarations.
 void handleRoot();
 void handleFavIcon();
+void handleDateTime();
+void handlePower();
+void handleData();
 void handleReboot();
 void convertParams();
 
@@ -225,6 +228,9 @@ void wifiInit() {
     server.on("/favicon.ico", [] { handleFavIcon(); });
     server.on("/config", [] { iotWebConf.handleConfig(); });
     server.on("/reboot", HTTP_GET, []() { handleReboot(); });
+    server.on("/DateTime", HTTP_GET, []() { handleDateTime(); });
+    server.on("/power", HTTP_GET, []() { handlePower(); });
+    server.on("/data", HTTP_GET, []() { handleData(); });
     server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
     Serial.println("Ready.");
@@ -244,6 +250,66 @@ void handleFavIcon() {
    server.send_P(200, "image/x-icon", favicon, sizeof(favicon));
 }
 
+void handleDateTime() {
+    ESP_LOGD("handleDateTime", "Time requested");
+	ESP32Time rtc;
+    String _time = rtc.getTime("%H:%M:%S");
+	server.send(200, "text/plain", _time);
+}
+
+void handlePower() {
+    server.send(200, "text/plain", String(gInputPower));
+}
+
+void handleData() {
+    String _json = "{";
+    
+    _json += "\"Power\":\"" + String(gInputPower) + "\"";
+    _json += ",\"Relays\":{";
+    Relay* _relay = &Relay1;
+    uint8_t _i = 1;
+    while (_relay != nullptr) {
+        if (_relay->IsEnabled()) {
+			_json += "\"relay" + String(_i) + "\":\"On\"";
+		}
+		else {
+			_json += "\"relay" + String(_i) + "\":\"Off\"";
+		}
+        
+        _relay = (Relay*)_relay->getNext();
+        if (_relay != nullptr) {
+			_json += ",";
+		}
+		_i++;
+    }
+    _json += "}";
+
+    _json += ",\"Shellys\":{";
+    Shelly* _shelly = &Shelly1;
+    _i = 1;
+    while (_shelly != nullptr) {
+        if (_shelly->isActive()) {
+            if(_shelly->IsEnabled() && (gInputPower > _shelly->GetPower())) {
+				_json += "\"shelly" + String(_i) + "\":\"On\"";
+			}
+			else if (_shelly->IsEnabled() && (gInputPower <= _shelly->GetPower())) {
+				_json += "\"shelly" + String(_i) + "\":\"delaying off\"";
+			}
+			else {
+				_json += "\"shelly" + String(_i) + "\":\"Off\"";
+			}
+        }
+        _shelly = (Shelly*)_shelly->getNext();
+        if ((_shelly != nullptr) && (_shelly->isActive())) {
+            _json += ",";
+        }
+        _i++;
+    }
+    _json += "}";
+    _json += "}";
+    server.send(200, "text/plain", _json);
+}
+
 void handleReboot() {
     String _message;
 
@@ -259,7 +325,6 @@ void handleReboot() {
 
 void handleRoot() {
     String name;
-    ESP32Time rtc;
 
     // -- Let IotWebConf test and handle captive portal requests.
     if (iotWebConf.handleCaptivePortal())
@@ -279,8 +344,10 @@ void handleRoot() {
 
     page += "</style>";
 
-    page += "<meta http-equiv=refresh content=30 />";
+    //page += "<meta http-equiv=refresh content=30 />";
     page += HTML_Start_Body;
+    page += HTML_script;
+
     page += "<table border=0 align=center>";
     page += "<tr><td>";
 
@@ -288,7 +355,7 @@ void handleRoot() {
     page += HTML_Fieldset_Legend;
     page.replace("{l}", "Power");
         page += HTML_Start_Table;
-        page += "<tr><td align=left>Input power:</td><td>" + String(gInputPower) + "W" + "</td></tr>";
+        page += "<tr><td align=left>Input power:</td><td><span id='PowerValue'>0</span>W</td></tr>";
         page += "<tr><td align=left>Intervall  :</td><td>" + String(gInverterInterval) + "s" + "</td></tr>";
 
         page += HTML_End_Table;
@@ -300,15 +367,13 @@ void handleRoot() {
     page += HTML_Start_Table;
 
     Relay* _relay = &Relay1;
+    uint8_t i = 1;
     while (_relay != nullptr) {
-        if (_relay->IsEnabled()) {
-            page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
-        }
-        else {
-            page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
-        }
 
+        // page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class='dot-grey' data-relay='relay" + String(i) + "'></span></td></tr>";
+        page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span id='relay" + String(i) + "'>Off</span></td></tr>";
         _relay = (Relay*)_relay->getNext();
+        i++;
     }
 
     page += HTML_End_Table;
@@ -321,18 +386,12 @@ void handleRoot() {
 
     Shelly* _shelly = &Shelly1;
     bool _enabled = false;
-    uint8_t i = 1;
+    i = 1;
     while (_shelly != nullptr) {
         if (_shelly->isActive()) {
-            if (_shelly->IsEnabled() && (gInputPower > _shelly->GetPower())) {
-                page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span class = \"dot-green\"></span></td></tr>";
-            }
-            else  if (_shelly->IsEnabled() && (gInputPower <= _shelly->GetPower())) {
-                page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span class = \"blink-green\"></span></td></tr>";
-            }
-            else {
-                page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span class=\"dot-grey\"></span></td></tr>";
-            }
+
+            //page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span class='dot-grey' data-shelly='shelly" + String(i) + "'></span></td></tr>";
+            page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span id='shelly" + String(i) + "'>Off</span></td></tr>";
 
         }
         _shelly = (Shelly*)_shelly->getNext();
@@ -357,7 +416,7 @@ void handleRoot() {
     page += "<br>";
 
     page += HTML_Start_Table;
-    page += "<tr><td align=left>Time:</td><td>" + rtc.getDateTime() + "</td></tr>";
+    page += "<tr><td align=left>Time:</td><td><span id='DateTimeValue'>0</span></td></tr>";
     page += "<tr><td align=left>Go to <a href = 'config'>configure page</a> to change configuration.</td></tr>";
     // page += "<tr><td align=left>Go to <a href='setruntime'>runtime modification page</a> to change runtime data.</td></tr>";
     page += HTML_End_Table;
