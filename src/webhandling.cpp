@@ -65,6 +65,13 @@ bool gParamsChanged = true;
 DNSServer dnsServer;
 WebServer server(80);
 
+class CustomHtmlFormatProvider : public iotwebconf::OptionalGroupHtmlFormatProvider {
+protected:
+    virtual String getFormEnd() {
+		return OptionalGroupHtmlFormatProvider::getFormEnd() + "</br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>";
+	}
+};
+CustomHtmlFormatProvider customHtmlFormatProvider;
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 
@@ -150,8 +157,6 @@ Shelly Shelly10 = Shelly("Shelly10");
 
 HTTPUpdateServer httpUpdater;
 
-iotwebconf::OptionalGroupHtmlFormatProvider optionalGroupHtmlFormatProvider;
-
 void wifiInit() {
     Serial.begin(115200);
     Serial.println();
@@ -161,7 +166,7 @@ void wifiInit() {
     iotWebConf.setStatusPin(STATUS_PIN, ON_LEVEL);
     iotWebConf.setConfigPin(CONFIG_PIN);
 
-    iotWebConf.setHtmlFormatProvider(&optionalGroupHtmlFormatProvider);
+    iotWebConf.setHtmlFormatProvider(&customHtmlFormatProvider);
 
     Relay1.setNext(&Relay2);
     Relay2.setNext(&Relay3);
@@ -423,7 +428,7 @@ void handleRoot() {
     page += HTML_End_Body;
 
     // add a button to trigger a reboot
-    page += "<form action='/reboot' method='get'><button type='submit'>Reboot</button></form>";
+    // page += "<form action='/reboot' method='get'><button type='submit'>Reboot</button></form>";
 
     page += HTML_End_Doc;
 
