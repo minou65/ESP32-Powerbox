@@ -17,6 +17,8 @@
 #include "ShellyHandling.h"
 #include "webhandling.h"
 
+char Version[] = "1.0.1.4 (2024-04-27)"; // Manufacturer's Software version code
+
 void setup() {
 	Serial.begin(115200);
 	while (!Serial) {
