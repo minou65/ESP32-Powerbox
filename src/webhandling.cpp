@@ -26,6 +26,7 @@
 #include "common.h"
 #include "webhandling.h"
 #include "favicon.h"
+#include "IotWebRoot.h"
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
 #define CONFIG_VERSION "A4"
@@ -301,7 +302,7 @@ void handleData() {
 				_json += "\"shelly" + String(_i) + "\":\"On\"";
 			}
 			else if (_shelly->IsEnabled() && (gInputPower <= _shelly->GetPower())) {
-				_json += "\"shelly" + String(_i) + "\":\"delaying off\"";
+				_json += "\"shelly" + String(_i) + "\":\"DelayedOff\"";
 			}
 			else {
 				_json += "\"shelly" + String(_i) + "\":\"Off\"";
@@ -331,112 +332,148 @@ void handleReboot() {
     ESP.restart();
 }
 
+class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {
+public:
+    String getHtmlTableRowClass(String name, String htmlclass, String id) {
+        String _s = F("<tr><td align=\"left\">{n}</td><td align=\"left\"><span id=\"{id}\" class=\"{c}\"></span></td></tr>\n");
+        _s.replace("{n}", name);
+        _s.replace("{c}", htmlclass);
+        _s.replace("{id}", id);
+        return _s;
+    }
+
+protected:
+    virtual String getStyleInner() {
+        String _s = HtmlRootFormatProvider::getStyleInner();
+        _s += F(".led {display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }\n");
+        _s += F(".led.off {background-color: grey;}\n");
+        _s += F(".led.on {background-color: green;}\n");
+        _s += F(".led.delayedoff {background-color: orange;}\n");
+        return _s;
+    }
+
+    virtual String getScriptInner() {
+        String _s = HtmlRootFormatProvider::getScriptInner();
+
+        _s.replace("{millisecond}", "5000");
+        _s += F("requestDateTime();\n");
+        _s += F("setInterval(requestDateTime, 1000);\n");
+
+        _s += F("function requestDateTime() { \n");
+        _s += F("   var xhttp = new XMLHttpRequest();\n");
+        _s += F("   xhttp.onreadystatechange = function() {\n");
+        _s += F("       if (this.readyState == 4 && this.status == 200) {\n");
+        _s += F("           document.getElementById('DateTimeValue').innerHTML = this.responseText;\n");
+        _s += F("       }\n");
+        _s += F("   };\n");
+        _s += F("   xhttp.open('GET', 'DateTime', true);\n");
+        _s += F("   xhttp.send(); \n");
+        _s += F("}\n");
+
+        _s += F("function updateLED(element, status) {\n");
+        _s += F("   if (element) {\n");
+        _s += F("       element.classList.remove('on', 'off', 'delayedoff');\n");
+        _s += F("       element.classList.add(status);\n");
+        _s += F("   }\n");
+        _s += F("}\n");
+
+        _s += F("function updateData(jsonData) {\n");
+        _s += F("   document.getElementById('PowerValue').innerHTML = jsonData.Power + \"W\" \n");
+
+        _s += F("   updateLED(document.getElementById('relay1'), jsonData.Relays.relay1.toLowerCase());\n");
+        _s += F("   updateLED(document.getElementById('relay2'), jsonData.Relays.relay2.toLowerCase());\n");
+        _s += F("   updateLED(document.getElementById('relay3'), jsonData.Relays.relay3.toLowerCase());\n");
+        _s += F("   updateLED(document.getElementById('relay4'), jsonData.Relays.relay4.toLowerCase());\n");
+
+        Shelly* _shelly = &Shelly1;
+        uint8_t _i = 1;
+        while (_shelly != nullptr) {
+            if (_shelly->isActive()) {
+                _s += "   updateLED(document.getElementById('shelly" + String(_i) + "'), jsonData.Shellys.shelly" + String(_i) + ".toLowerCase());\n";
+            }
+            _shelly = (Shelly*)_shelly->getNext();
+            _i++;
+        }
+
+        _s += F("}\n");
+
+        return _s;
+    }
+};
+
 void handleRoot() {
     String name;
 
     // -- Let IotWebConf test and handle captive portal requests.
-    if (iotWebConf.handleCaptivePortal())
-    {
+    if (iotWebConf.handleCaptivePortal()){
         // -- Captive portal request were already served.
         return;
     }
 
-    String page = HTML_Start_Doc;
-    page.replace("{v}", "Powerbox");
-    page += "<style>";
-    page += ".de{background-color:#ffaaaa;} .em{font-size:0.8em;color:#bb0000;padding-bottom:0px;} .c{text-align: center;} div,input,select{padding:5px;font-size:1em;} input{width:95%;} select{width:100%} input[type=checkbox]{width:auto;scale:1.5;margin:10px;} body{text-align: center;font-family:verdana;} button{border:0;border-radius:0.3rem;background-color:#16A1E7;color:#fff;line-height:2.4rem;font-size:1.2rem;width:100%;} fieldset{border-radius:0.3rem;margin: 0px;}";
-    // page.replace("center", "left");
-    page += ".dot-grey{height: 12px; width: 12px; background-color: #bbb; border-radius: 50%; display: inline-block; }";
-    page += ".dot-green{height: 12px; width: 12px; background-color: green; border-radius: 50%; display: inline-block; }";
-    page += ".blink-green{2s blink-green ease infinite; height: 12px; width: 12px; background-color: orange; border-radius: 50%; display: inline-block; }";
+    MyHtmlRootFormatProvider rootFormatProvider;
 
-    page += "</style>";
+    String _response = "";
+    _response += rootFormatProvider.getHtmlHead(iotWebConf.getThingName());
+    _response += rootFormatProvider.getHtmlStyle();
+    _response += rootFormatProvider.getHtmlHeadEnd();
+    _response += rootFormatProvider.getHtmlScript();
 
-    //page += "<meta http-equiv=refresh content=30 />";
-    page += HTML_Start_Body;
-    page += HTML_script;
+    _response += rootFormatProvider.getHtmlTable();
+    _response += rootFormatProvider.getHtmlTableRow() + rootFormatProvider.getHtmlTableCol();
 
-    page += "<table border=0 align=center>";
-    page += "<tr><td>";
+    _response += rootFormatProvider.getHtmlFieldset("Power");
+    _response += rootFormatProvider.getHtmlTable();
+    _response += rootFormatProvider.getHtmlTableRowSpan("Input power:", "no data", "PowerValue");
+    _response += rootFormatProvider.getHtmlTableRowText("Intervall:", String(gInverterInterval) + "s");
+	_response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlFieldsetEnd();
 
-    page += HTML_Start_Fieldset;
-    page += HTML_Fieldset_Legend;
-    page.replace("{l}", "Power");
-        page += HTML_Start_Table;
-        page += "<tr><td align=left>Input power:</td><td><span id='PowerValue'>0</span>W</td></tr>";
-        page += "<tr><td align=left>Intervall  :</td><td>" + String(gInverterInterval) + "s" + "</td></tr>";
-
-        page += HTML_End_Table;
-    page += HTML_End_Fieldset;
-
-    page += HTML_Start_Fieldset;
-    page += HTML_Fieldset_Legend;
-    page.replace("{l}", "Relays");
-    page += HTML_Start_Table;
-
+    _response += rootFormatProvider.getHtmlFieldset("Relays");
+    _response += rootFormatProvider.getHtmlTable();
     Relay* _relay = &Relay1;
-    uint8_t i = 1;
+    uint8_t _i = 1;
     while (_relay != nullptr) {
+        _response += rootFormatProvider.getHtmlTableRowClass(String(_relay->DesignationValue) + ":", "led off", "relay" + String(_i));
+		_relay = (Relay*)_relay->getNext();
+		_i++;
+	}
+    _response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlFieldsetEnd();
 
-        // page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span class='dot-grey' data-relay='relay" + String(i) + "'></span></td></tr>";
-        page += "<tr><td align=left>" + String(_relay->DesignationValue) + ":</td><td><span id='relay" + String(i) + "'>Off</span></td></tr>";
-        _relay = (Relay*)_relay->getNext();
-        i++;
-    }
-
-    page += HTML_End_Table;
-    page += HTML_End_Fieldset;
-
-    page += HTML_Start_Fieldset;
-    page += HTML_Fieldset_Legend;
-    page.replace("{l}", "Shellys");
-    page += HTML_Start_Table;
-
+    _response += rootFormatProvider.getHtmlFieldset("Shellys");
+    _response += rootFormatProvider.getHtmlTable();
     Shelly* _shelly = &Shelly1;
-    bool _enabled = false;
-    i = 1;
+    _i = 1;
     while (_shelly != nullptr) {
         if (_shelly->isActive()) {
-
-            //page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span class='dot-grey' data-shelly='shelly" + String(i) + "'></span></td></tr>";
-            page += "<tr><td align=left>" + String(_shelly->DesignationValue) + ":</td><td><span id='shelly" + String(i) + "'>Off</span></td></tr>";
-
+            _response += rootFormatProvider.getHtmlTableRowClass(String(_shelly->DesignationValue) + ":", "led off", "shelly" + String(_i));
         }
         _shelly = (Shelly*)_shelly->getNext();
-        i++;
+        _i++;
     }
+    _response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlFieldsetEnd();
 
-    page += HTML_End_Table;
-    page += HTML_End_Fieldset;
+    _response += rootFormatProvider.getHtmlFieldset("Network");
+    _response += rootFormatProvider.getHtmlTable();
+    _response += rootFormatProvider.getHtmlTableRowText("MAC Address:", WiFi.macAddress());
+    _response += rootFormatProvider.getHtmlTableRowText("IP Address:", WiFi.localIP().toString().c_str());
+    _response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlFieldsetEnd();
 
-    page += HTML_Start_Fieldset;
-    page += HTML_Fieldset_Legend;
-    page.replace("{l}", "Network");
-    page += HTML_Start_Table;
+    _response += rootFormatProvider.addNewLine(2);
 
-    page += "<tr><td align=left>MAC Address:</td><td>" + String(WiFi.macAddress()) + "</td></tr>";
-    page += "<tr><td align=left>IP Address:</td><td>" + String(WiFi.localIP().toString().c_str()) + "</td></tr>";
+    _response += rootFormatProvider.getHtmlTable();
+    _response += rootFormatProvider.getHtmlTableRowSpan("Time:", "not valid", "DateTimeValue");
+    _response += rootFormatProvider.getHtmlTableRowText("Go to <a href = 'config'>configure page</a> to change configuration.");
+    _response += rootFormatProvider.getHtmlTableRowText(rootFormatProvider.getHtmlVersion(Version));
+    _response += rootFormatProvider.getHtmlTableEnd();
 
-    page += HTML_End_Table;
-    page += HTML_End_Fieldset;
+    _response += rootFormatProvider.getHtmlTableColEnd() + rootFormatProvider.getHtmlTableRowEnd();
+    _response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlEnd();
 
-    page += "<br>";
-    page += "<br>";
-
-    page += HTML_Start_Table;
-    page += "<tr><td align=left>Time:</td><td><span id='DateTimeValue'>0</span></td></tr>";
-    page += "<tr><td align=left>Go to <a href = 'config'>configure page</a> to change configuration.</td></tr>";
-    // page += "<tr><td align=left>Go to <a href='setruntime'>runtime modification page</a> to change runtime data.</td></tr>";
-    page += HTML_End_Table;
-    page += HTML_End_Body;
-
-    // add a button to trigger a reboot
-    // page += "<form action='/reboot' method='get'><button type='submit'>Reboot</button></form>";
-
-    page += HTML_End_Doc;
-
-
-    server.send(200, "text/html", page);
+    server.send(200, "text/html", _response);
 }
 
 void convertParams() {
