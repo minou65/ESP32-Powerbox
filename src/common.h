@@ -14,6 +14,8 @@
 #define STRING_LEN 50
 #define NUMBER_LEN 6
 
+extern char Version[];
+
 extern int gInputPower;
 
 extern char gInverterIPAddress[15];
