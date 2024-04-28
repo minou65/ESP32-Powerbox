@@ -41,6 +41,12 @@ The PVPowerbox allows loads to be switched on or off depending on the power avai
 [ModbusClientTCP](https://github.com/eModbus/eModbus)</br>
 [AsyncTCP](https://github.com/dvarrel/AsyncTCP)
 
+## Received Signal Strength Indicator (RSSI)
+The RSSI is displayed in dBm at the top right. RSSI, is a measurement of how well your device can hear a signal from an access point or router.
+- **Required for Amazing Signal Strength:** Around -30 dBm. Achievable only when the client device is very close to the access point (AP).
+- **Very Good Signal Strength:** Approximately -67 dBm. Suitable for applications like VoIP/VoWi-Fi and streaming video.
+- **Moderate Signal Strength:** Around -70 dBm.
+
 ## Settings
 ### Inverter
 #### IPAddress
