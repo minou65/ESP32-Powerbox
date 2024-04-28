@@ -17,9 +17,10 @@
 #include "ShellyHandling.h"
 #include "webhandling.h"
 
-char Version[] = "1.0.1.4 (2024-04-27)"; // Manufacturer's Software version code
+char Version[] = "1.0.1.5 (2024-04-28)"; // Manufacturer's Software version code
 
 void setup() {
+	WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable   detector
 	Serial.begin(115200);
 	while (!Serial) {
 		delay(1);

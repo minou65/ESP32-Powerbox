@@ -274,6 +274,7 @@ void handleData() {
     String _json = "{";
     
     _json += "\"Power\":\"" + String(gInputPower) + "\"";
+    _json += ",\"RSSI\":\"" + String(WiFi.RSSI()) + "\"";
     _json += ",\"Relays\":{";
     Relay* _relay = &Relay1;
     uint8_t _i = 1;
@@ -379,6 +380,7 @@ protected:
 
         _s += F("function updateData(jsonData) {\n");
         _s += F("   document.getElementById('PowerValue').innerHTML = jsonData.Power + \"W\" \n");
+        _s += F("   document.getElementById('RSSIValue').innerHTML = jsonData.RSSI + \"dBm\" \n");
 
         _s += F("   updateLED(document.getElementById('relay1'), jsonData.Relays.relay1.toLowerCase());\n");
         _s += F("   updateLED(document.getElementById('relay2'), jsonData.Relays.relay2.toLowerCase());\n");
@@ -420,6 +422,12 @@ void handleRoot() {
 
     _response += rootFormatProvider.getHtmlTable();
     _response += rootFormatProvider.getHtmlTableRow() + rootFormatProvider.getHtmlTableCol();
+
+    _response += F("<fieldset align=left style=\"border: 1px solid\">\n");
+    _response += F("<table border=\"0\" align=\"center\" width=\"100%\">\n");
+    _response += F("<tr><td align=\"left\"><span id=\"DateTimeValue\">not valid</span></td></td><td align=\"right\"><span id=\"RSSIValue\">-100</span></td></tr>\n");
+    _response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlFieldsetEnd();
 
     _response += rootFormatProvider.getHtmlFieldset("Power");
     _response += rootFormatProvider.getHtmlTable();
@@ -464,7 +472,7 @@ void handleRoot() {
     _response += rootFormatProvider.addNewLine(2);
 
     _response += rootFormatProvider.getHtmlTable();
-    _response += rootFormatProvider.getHtmlTableRowSpan("Time:", "not valid", "DateTimeValue");
+    //_response += rootFormatProvider.getHtmlTableRowSpan("Time:", "not valid", "DateTimeValue");
     _response += rootFormatProvider.getHtmlTableRowText("Go to <a href = 'config'>configure page</a> to change configuration.");
     _response += rootFormatProvider.getHtmlTableRowText(rootFormatProvider.getHtmlVersion(Version));
     _response += rootFormatProvider.getHtmlTableEnd();
