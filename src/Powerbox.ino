@@ -17,7 +17,9 @@
 #include "ShellyHandling.h"
 #include "webhandling.h"
 
-char Version[] = "1.0.1.5 (2024-04-28)"; // Manufacturer's Software version code
+#include "version.h"
+
+char Version[] = VERSION; // Manufacturer's Software version code
 
 void setup() {
 	WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable   detector
@@ -25,6 +27,7 @@ void setup() {
 	while (!Serial) {
 		delay(1);
 	}
+	Serial.println("PV Powerbox v" + String(Version) + " started");
 
 	wifiInit();
 	NTPInit();
