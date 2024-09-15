@@ -36,6 +36,8 @@
 The PVPowerbox allows loads to be switched on or off depending on the power available from the photovoltaics. In the picture you can see how the loads (red) are switched on and off, depending on the power (green) that is available. The regular peaks are from the heat pump, which is not controlled via the PVPowerbox
 
 ![alt text](img/20240318_160704000_iOS.png)
+<img src="img/Bild1.jpg" alt="Home page" style="width:300px;"/>
+
 
 ## Librarys
 [ModbusClientTCP](https://github.com/eModbus/eModbus)</br>
