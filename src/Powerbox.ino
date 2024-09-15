@@ -26,6 +26,7 @@ void setup() {
 	while (!Serial) {
 		delay(1);
 	}
+	Serial.println("PV Powerbox v" + String(Version) + " started");
 
 	wifiInit();
 	NTPInit();

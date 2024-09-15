@@ -403,3 +403,4 @@ FodyWeavers.xsd
 .vscode/settings.json
 /img/Thumbs.db
 /src/Powerbox.ino.nodemcu-32s.bin
+*.txt
