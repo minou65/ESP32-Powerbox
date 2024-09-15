@@ -26,7 +26,7 @@
 #include "common.h"
 #include "webhandling.h"
 #include "favicon.h"
-#include "IotWebRoot.h"
+#include <IotWebRoot.h>
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
 #define CONFIG_VERSION "A4"
