@@ -16,8 +16,9 @@
 #include "RelayHandling.h"
 #include "ShellyHandling.h"
 #include "webhandling.h"
+#include "version.h"
 
-char Version[] = "1.0.1.5 (2024-04-28)"; // Manufacturer's Software version code
+char Version[] = VERSION_STR; // Manufacturer's Software version code
 
 void setup() {
 	WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable   detector
