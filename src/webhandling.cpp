@@ -262,9 +262,16 @@ void handleFavIcon() {
 
 void handleDateTime() {
     ESP_LOGD("handleDateTime", "Time requested");
-	ESP32Time rtc_;
-    String time_ = rtc_.getTime("%H:%M:%S");
-	server.send(200, "text/plain", time_);
+
+    // Get the current time
+    time_t now_ = time(nullptr);
+    struct tm* timeinfo_ = localtime(&now_);
+    char timeStr_[20];
+    char dateStr_[20];
+    strftime(timeStr_, sizeof(timeStr_), "%H:%M:%S", timeinfo_);
+    strftime(dateStr_, sizeof(dateStr_), "%Y-%m-%d", timeinfo_);
+
+	server.send(200, "text/plain", String(timeStr_));
 }
 
 void handlePower() {

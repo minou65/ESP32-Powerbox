@@ -23,6 +23,11 @@
 
 char Version[] = VERSION_STR; // Manufacturer's Software version code
 
+NTPClient ntpClient;
+String gNTPServer = "ntp.metas.ch"; // "pool.ntp.org";
+String gTimeZone = "CET-1CEST,M3.5.0,M10.5.0/3";
+bool gUseNTPServer = true;
+
 void setup() {
 	WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable   detector
 	Serial.begin(115200);
@@ -32,10 +37,16 @@ void setup() {
 	Serial.println("PV Powerbox v" + String(Version) + " started");
 
 	wifiInit();
-	NTPInit();
 	RelaySetup();
 	ShellySetup();
 	InverterSetup();
+
+	if (gUseNTPServer) {
+		ntpClient.begin(gNTPServer, gTimeZone, 0);
+	}
+	else {
+		Serial.println(F("NTP not used"));
+	}
 }
 
 void loop() {
@@ -45,7 +56,10 @@ void loop() {
 		InverterLoop();
 		RelayLoop();
         ShellyLoop();
-		NTPloop();
+
+		if (ntpClient.isInitialized()) {
+			ntpClient.process();
+		}
 	}
 	else {
 		RelayDisableAll();
