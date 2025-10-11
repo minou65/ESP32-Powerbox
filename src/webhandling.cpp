@@ -6,11 +6,7 @@
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
-#if ESP32
 #include <WiFi.h>
-#else
-#include <ESP8266WiFi.h>      
-#endif
 
 #include <time.h>
 #include "ESP32Time.h"
@@ -56,12 +52,15 @@ void handlePower();
 void handleData();
 void handleReboot();
 void convertParams();
+void connectWifi(const char* ssid, const char* password);
+iotwebconf::WifiAuthInfo* handleConnectWifiFailure();
 
 // -- Callback methods.
 void configSaved();
 void wifiConnected();
 
 bool gParamsChanged = true;
+bool startAPMode = true;
 
 DNSServer dnsServer;
 WebServer server(80);
@@ -224,6 +223,8 @@ void wifiInit() {
 
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
+    iotWebConf.setWifiConnectionHandler(&connectWifi);
+    iotWebConf.setWifiConnectionFailedHandler(&handleConnectWifiFailure);
 
     iotWebConf.getApTimeoutParameter()->visible = true;
 
@@ -482,6 +483,17 @@ void handleRoot() {
     _response += rootFormatProvider.getHtmlEnd();
 
     server.send(200, "text/html", _response);
+}
+
+void connectWifi(const char* ssid, const char* password) {
+    Serial.println("Connecting to WiFi ...");
+    WiFi.begin(ssid, password);
+}
+
+iotwebconf::WifiAuthInfo* handleConnectWifiFailure() {
+    static iotwebconf::WifiAuthInfo auth_;
+    auth_ = iotWebConf.getWifiAuthInfo();
+    return &auth_;
 }
 
 void convertParams() {

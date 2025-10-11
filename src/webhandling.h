@@ -3,17 +3,7 @@
 #ifndef _WEBHANDLING_h
 #define _WEBHANDLING_h
 
-#if defined(ARDUINO) && ARDUINO >= 100
 #include "arduino.h"
-#else
-#include "WProgram.h"
-#endif
-
-#if ESP32
-#include <WiFi.h>
-#else
-#include <ESP8266WiFi.h>      
-#endif
 
 #include <IotWebConf.h>
 #include <IotWebConfOptionalGroup.h>

@@ -2,6 +2,9 @@
  Name:		Powerbox.ino
  Created:	17.04.2023 07:05:09
  Author:	andy
+
+ use WEMOS D1 MINI ESP32
+
 */
 
 
