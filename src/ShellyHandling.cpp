@@ -9,12 +9,12 @@ HTTPClient http;
 Neotimer ShellyIntervall = Neotimer(30000);
 
 
-void httpget(String URL_) {
+void httpget(String URL) {
 
-    http.begin(URL_);
+    http.begin(URL);
     int httpCode = http.GET();
 
-    Serial.print("invoked web request to "); Serial.println(URL_);
+    Serial.print("invoked web request to "); Serial.println(URL);
 
     if (httpCode > 0) {
         String payload = http.getString();
@@ -36,7 +36,7 @@ void ShellyLoop() {
 
     if (!ShellyIntervall.repeat()) { return; }
 
-    Shelly* _shelly = &Shelly1;
+    Shelly* shelly_ = &Shelly1;
     bool _enabled = false;
     ESP32Time rtc;
 
@@ -44,43 +44,43 @@ void ShellyLoop() {
     Serial.println(_time);
 
     uint8_t i = 1;
-    while (_shelly != nullptr) {
-        if (_shelly->isActive()) {
+    while (shelly_ != nullptr) {
+        if (shelly_->isActive()) {
 
-            _enabled = (gInputPower > _shelly->GetPower()) && (_time > String(_shelly->TimeValue));
+            _enabled = (gInputPower > shelly_->getPower()) && (_time > shelly_->TimeValue());
 
             if (_enabled) {
 
-                if (_shelly->IsEnabled() == false) {
-                    httpget(String(_shelly->url_OnValue));
-                    _shelly->SetEnabled(true);
+                if (shelly_->isEnabled() == false) {
+                    httpget(shelly_->url_OnValue());
+                    shelly_->setEnabled(true);
                     Serial.printf("Shelly %i enabled\n", i);
 
                 }
-                _shelly->timer.start(_shelly->GetDelay() * 60 * 1000);
+                shelly_->_timer.start(shelly_->getDelay() * 60 * 1000);
 
             }
             else {
 
-                if (_shelly->IsEnabled() && _shelly->timer.done()) {
-                    httpget(String(_shelly->url_OffValue));
-                    _shelly->SetEnabled(false);
+                if (shelly_->isEnabled() && shelly_->_timer.done()) {
+                    httpget(shelly_->url_OffValue());
+                    shelly_->setEnabled(false);
                     Serial.printf("Shelly %i disabled\n", i);
                 }
             }
         }
-        _shelly = (Shelly*)_shelly->getNext();
+        shelly_ = (Shelly*)shelly_->getNext();
         i++;
     }
 }
 
 void ShellyDisableAll() {
-    Shelly* _shelly = &Shelly1;
-    while (_shelly != nullptr) {
-        if (_shelly->isActive()) {
-            _shelly->SetEnabled(false);
-            httpget(String(_shelly->url_OffValue));
+    Shelly* shelly_ = &Shelly1;
+    while (shelly_ != nullptr) {
+        if (shelly_->isActive()) {
+            shelly_->setEnabled(false);
+            httpget(shelly_->url_OffValue());
         }
-        _shelly = (Shelly*)_shelly->getNext();
+        shelly_ = (Shelly*)shelly_->getNext();
     }
 }

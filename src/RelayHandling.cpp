@@ -7,34 +7,34 @@
 #include "webhandling.h"
 
 void RelaySetup() {
-	Relay* _relay = &Relay1;
-	while (_relay != nullptr) {
-		pinMode(_relay->GetGPIO(), OUTPUT);
-		_relay = (Relay*)_relay->getNext();
+	Relay* relay_ = &Relay1;
+	while (relay_ != nullptr) {
+		pinMode(relay_->getGPIO(), OUTPUT);
+		relay_ = (Relay*)relay_->getNext();
 	}
 }
 
 void RelayLoop() {
-	Relay* _relay = &Relay1;
-	while (_relay != nullptr) {
-		_relay->SetEnabled((gInputPower > _relay->GetPower()));
+	Relay* relay_ = &Relay1;
+	while (relay_ != nullptr) {
+		relay_->setEnabled((gInputPower > relay_->getPower()));
 
-		if (_relay->IsEnabled()) {
-			digitalWrite(_relay->GetGPIO(), HIGH);
+		if (relay_->isEnabled()) {
+			digitalWrite(relay_->getGPIO(), HIGH);
 		}
 		else {
-			digitalWrite(_relay->GetGPIO(), LOW);
+			digitalWrite(relay_->getGPIO(), LOW);
 			}
 
-		_relay = (Relay*)_relay->getNext();
+		relay_ = (Relay*)relay_->getNext();
 	}
 }
 
 void RelayDisableAll() {
-	Relay* _relay = &Relay1;
-	while (_relay != nullptr) {
-		_relay->SetEnabled(false);
-		digitalWrite(_relay->GetGPIO(), LOW);
-		_relay = (Relay*)_relay->getNext();
+	Relay* relay_ = &Relay1;
+	while (relay_ != nullptr) {
+		relay_->setEnabled(false);
+		digitalWrite(relay_->getGPIO(), LOW);
+		relay_ = (Relay*)relay_->getNext();
 	}
 }

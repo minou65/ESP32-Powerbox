@@ -68,10 +68,10 @@ WebServer server(80);
 class CustomHtmlFormatProvider : public iotwebconf::OptionalGroupHtmlFormatProvider {
 protected:
     virtual String getFormEnd() {
-        String _s = OptionalGroupHtmlFormatProvider::getFormEnd();
-        _s += F("</br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>");
-        _s += F("</br>Return to <a href='/'>home page</a>.");
-		return _s;
+        String s_ = OptionalGroupHtmlFormatProvider::getFormEnd();
+        s_ += F("</br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>");
+        s_ += F("</br>Return to <a href='/'>home page</a>.");
+		return s_;
 	}
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
@@ -262,9 +262,9 @@ void handleFavIcon() {
 
 void handleDateTime() {
     ESP_LOGD("handleDateTime", "Time requested");
-	ESP32Time rtc;
-    String _time = rtc.getTime("%H:%M:%S");
-	server.send(200, "text/plain", _time);
+	ESP32Time rtc_;
+    String time_ = rtc_.getTime("%H:%M:%S");
+	server.send(200, "text/plain", time_);
 }
 
 void handlePower() {
@@ -272,217 +272,215 @@ void handlePower() {
 }
 
 void handleData() {
-    String _json = "{";
+    String json_ = "{";
     
-    _json += "\"Power\":\"" + String(gInputPower) + "\"";
-    _json += ",\"RSSI\":\"" + String(WiFi.RSSI()) + "\"";
-    _json += ",\"Relays\":{";
-    Relay* _relay = &Relay1;
-    uint8_t _i = 1;
-    while (_relay != nullptr) {
-        if (_relay->IsEnabled()) {
-			_json += "\"relay" + String(_i) + "\":\"On\"";
+    json_ += "\"Power\":\"" + String(gInputPower) + "\"";
+    json_ += ",\"RSSI\":\"" + String(WiFi.RSSI()) + "\"";
+    json_ += ",\"Relays\":{";
+    Relay* relay_ = &Relay1;
+    uint8_t i_ = 1;
+    while (relay_ != nullptr) {
+        if (relay_->isEnabled()) {
+			json_ += "\"relay" + String(i_) + "\":\"On\"";
 		}
 		else {
-			_json += "\"relay" + String(_i) + "\":\"Off\"";
+			json_ += "\"relay" + String(i_) + "\":\"Off\"";
 		}
         
-        _relay = (Relay*)_relay->getNext();
-        if (_relay != nullptr) {
-			_json += ",";
+        relay_ = (Relay*)relay_->getNext();
+        if (relay_ != nullptr) {
+			json_ += ",";
 		}
-		_i++;
+		i_++;
     }
-    _json += "}";
+    json_ += "}";
 
-    _json += ",\"Shellys\":{";
-    Shelly* _shelly = &Shelly1;
-    _i = 1;
-    while (_shelly != nullptr) {
-        if (_shelly->isActive()) {
-            if(_shelly->IsEnabled() && (gInputPower > _shelly->GetPower())) {
-				_json += "\"shelly" + String(_i) + "\":\"On\"";
+    json_ += ",\"Shellys\":{";
+    Shelly* shelly_ = &Shelly1;
+    i_ = 1;
+    while (shelly_ != nullptr) {
+        if (shelly_->isActive()) {
+            if(shelly_->isEnabled() && (gInputPower > shelly_->getPower())) {
+				json_ += "\"shelly" + String(i_) + "\":\"On\"";
 			}
-			else if (_shelly->IsEnabled() && (gInputPower <= _shelly->GetPower())) {
-				_json += "\"shelly" + String(_i) + "\":\"DelayedOff\"";
+			else if (shelly_->isEnabled() && (gInputPower <= shelly_->getPower())) {
+				json_ += "\"shelly" + String(i_) + "\":\"DelayedOff\"";
 			}
 			else {
-				_json += "\"shelly" + String(_i) + "\":\"Off\"";
+				json_ += "\"shelly" + String(i_) + "\":\"Off\"";
 			}
         }
-        _shelly = (Shelly*)_shelly->getNext();
-        if ((_shelly != nullptr) && (_shelly->isActive())) {
-            _json += ",";
+        shelly_ = (Shelly*)shelly_->getNext();
+        if ((shelly_ != nullptr) && (shelly_->isActive())) {
+            json_ += ",";
         }
-        _i++;
+        i_++;
     }
-    _json += "}";
-    _json += "}";
-    server.send(200, "text/plain", _json);
+    json_ += "}";
+    json_ += "}";
+    server.send(200, "text/plain", json_);
 }
 
 void handleReboot() {
-    String _message;
+    String message_;
 
     // redirect to the root page after 15 seconds
-    _message += "<HEAD><meta http-equiv=\"refresh\" content=\"15;url=/\"></HEAD>\n<BODY><p>\n";
-    _message += "Rebooting...<br>\n";
-    _message += "Redirected after 15 seconds...\n";
-    _message += "</p></BODY>\n";
+    message_ += "<HEAD><meta http-equiv=\"refresh\" content=\"15;url=/\"></HEAD>\n<BODY><p>\n";
+    message_ += "Rebooting...<br>\n";
+    message_ += "Redirected after 15 seconds...\n";
+    message_ += "</p></BODY>\n";
 
-    server.send(200, "text/html", _message);
+    server.send(200, "text/html", message_);
     ESP.restart();
 }
 
 class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {
 public:
     String getHtmlTableRowClass(String name, String htmlclass, String id) {
-        String _s = F("<tr><td align=\"left\">{n}</td><td align=\"left\"><span id=\"{id}\" class=\"{c}\"></span></td></tr>\n");
-        _s.replace("{n}", name);
-        _s.replace("{c}", htmlclass);
-        _s.replace("{id}", id);
-        return _s;
+        String s_ = F("<tr><td align=\"left\">{n}</td><td align=\"left\"><span id=\"{id}\" class=\"{c}\"></span></td></tr>\n");
+        s_.replace("{n}", name);
+        s_.replace("{c}", htmlclass);
+        s_.replace("{id}", id);
+        return s_;
     }
 
 protected:
     virtual String getStyleInner() {
-        String _s = HtmlRootFormatProvider::getStyleInner();
-        _s += F(".led {display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }\n");
-        _s += F(".led.off {background-color: grey;}\n");
-        _s += F(".led.on {background-color: green;}\n");
-        _s += F(".led.delayedoff {background-color: orange;}\n");
-        return _s;
+        String s_ = HtmlRootFormatProvider::getStyleInner();
+        s_ += F(".led {display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }\n");
+        s_ += F(".led.off {background-color: grey;}\n");
+        s_ += F(".led.on {background-color: green;}\n");
+        s_ += F(".led.delayedoff {background-color: orange;}\n");
+        return s_;
     }
 
     virtual String getScriptInner() {
-        String _s = HtmlRootFormatProvider::getScriptInner();
+        String s_ = HtmlRootFormatProvider::getScriptInner();
 
-        _s.replace("{millisecond}", "5000");
-        _s += F("requestDateTime();\n");
-        _s += F("setInterval(requestDateTime, 1000);\n");
+        s_.replace("{millisecond}", "5000");
+        s_ += F("requestDateTime();\n");
+        s_ += F("setInterval(requestDateTime, 1000);\n");
 
-        _s += F("function requestDateTime() { \n");
-        _s += F("   var xhttp = new XMLHttpRequest();\n");
-        _s += F("   xhttp.onreadystatechange = function() {\n");
-        _s += F("       if (this.readyState == 4 && this.status == 200) {\n");
-        _s += F("           document.getElementById('DateTimeValue').innerHTML = this.responseText;\n");
-        _s += F("       }\n");
-        _s += F("   };\n");
-        _s += F("   xhttp.open('GET', 'DateTime', true);\n");
-        _s += F("   xhttp.send(); \n");
-        _s += F("}\n");
+        s_ += F("function requestDateTime() { \n");
+        s_ += F("   var xhttp = new XMLHttpRequest();\n");
+        s_ += F("   xhttp.onreadystatechange = function() {\n");
+        s_ += F("       if (this.readyState == 4 && this.status == 200) {\n");
+        s_ += F("           document.getElementById('DateTimeValue').innerHTML = this.responseText;\n");
+        s_ += F("       }\n");
+        s_ += F("   };\n");
+        s_ += F("   xhttp.open('GET', 'DateTime', true);\n");
+        s_ += F("   xhttp.send(); \n");
+        s_ += F("}\n");
 
-        _s += F("function updateLED(element, status) {\n");
-        _s += F("   if (element) {\n");
-        _s += F("       element.classList.remove('on', 'off', 'delayedoff');\n");
-        _s += F("       element.classList.add(status);\n");
-        _s += F("   }\n");
-        _s += F("}\n");
+        s_ += F("function updateLED(element, status) {\n");
+        s_ += F("   if (element) {\n");
+        s_ += F("       element.classList.remove('on', 'off', 'delayedoff');\n");
+        s_ += F("       element.classList.add(status);\n");
+        s_ += F("   }\n");
+        s_ += F("}\n");
 
-        _s += F("function updateData(jsonData) {\n");
-        _s += F("   document.getElementById('PowerValue').innerHTML = jsonData.Power + \"W\" \n");
-        _s += F("   document.getElementById('RSSIValue').innerHTML = jsonData.RSSI + \"dBm\" \n");
+        s_ += F("function updateData(jsonData) {\n");
+        s_ += F("   document.getElementById('PowerValue').innerHTML = jsonData.Power + \"W\" \n");
+        s_ += F("   document.getElementById('RSSIValue').innerHTML = jsonData.RSSI + \"dBm\" \n");
 
-        _s += F("   updateLED(document.getElementById('relay1'), jsonData.Relays.relay1.toLowerCase());\n");
-        _s += F("   updateLED(document.getElementById('relay2'), jsonData.Relays.relay2.toLowerCase());\n");
-        _s += F("   updateLED(document.getElementById('relay3'), jsonData.Relays.relay3.toLowerCase());\n");
-        _s += F("   updateLED(document.getElementById('relay4'), jsonData.Relays.relay4.toLowerCase());\n");
+        s_ += F("   updateLED(document.getElementById('relay1'), jsonData.Relays.relay1.toLowerCase());\n");
+        s_ += F("   updateLED(document.getElementById('relay2'), jsonData.Relays.relay2.toLowerCase());\n");
+        s_ += F("   updateLED(document.getElementById('relay3'), jsonData.Relays.relay3.toLowerCase());\n");
+        s_ += F("   updateLED(document.getElementById('relay4'), jsonData.Relays.relay4.toLowerCase());\n");
 
-        Shelly* _shelly = &Shelly1;
-        uint8_t _i = 1;
-        while (_shelly != nullptr) {
-            if (_shelly->isActive()) {
-                _s += "   updateLED(document.getElementById('shelly" + String(_i) + "'), jsonData.Shellys.shelly" + String(_i) + ".toLowerCase());\n";
+        Shelly* shelly_ = &Shelly1;
+        uint8_t i_ = 1;
+        while (shelly_ != nullptr) {
+            if (shelly_->isActive()) {
+                s_ += "   updateLED(document.getElementById('shelly" + String(i_) + "'), jsonData.Shellys.shelly" + String(i_) + ".toLowerCase());\n";
             }
-            _shelly = (Shelly*)_shelly->getNext();
-            _i++;
+            shelly_ = (Shelly*)shelly_->getNext();
+            i_++;
         }
 
-        _s += F("}\n");
+        s_ += F("}\n");
 
-        return _s;
+        return s_;
     }
 };
 
 void handleRoot() {
-    String name;
-
     // -- Let IotWebConf test and handle captive portal requests.
     if (iotWebConf.handleCaptivePortal()){
         // -- Captive portal request were already served.
         return;
     }
 
-    MyHtmlRootFormatProvider rootFormatProvider;
+    MyHtmlRootFormatProvider fp_;
 
-    String _response = "";
-    _response += rootFormatProvider.getHtmlHead(iotWebConf.getThingName());
-    _response += rootFormatProvider.getHtmlStyle();
-    _response += rootFormatProvider.getHtmlHeadEnd();
-    _response += rootFormatProvider.getHtmlScript();
+    String response_ = "";
+    response_ += fp_.getHtmlHead(iotWebConf.getThingName());
+    response_ += fp_.getHtmlStyle();
+    response_ += fp_.getHtmlHeadEnd();
+    response_ += fp_.getHtmlScript();
 
-    _response += rootFormatProvider.getHtmlTable();
-    _response += rootFormatProvider.getHtmlTableRow() + rootFormatProvider.getHtmlTableCol();
+    response_ += fp_.getHtmlTable();
+    response_ += fp_.getHtmlTableRow() + fp_.getHtmlTableCol();
 
-    _response += F("<fieldset align=left style=\"border: 1px solid\">\n");
-    _response += F("<table border=\"0\" align=\"center\" width=\"100%\">\n");
-    _response += F("<tr><td align=\"left\"><span id=\"DateTimeValue\">not valid</span></td></td><td align=\"right\"><span id=\"RSSIValue\">-100</span></td></tr>\n");
-    _response += rootFormatProvider.getHtmlTableEnd();
-    _response += rootFormatProvider.getHtmlFieldsetEnd();
+    response_ += F("<fieldset align=left style=\"border: 1px solid\">\n");
+    response_ += F("<table border=\"0\" align=\"center\" width=\"100%\">\n");
+    response_ += F("<tr><td align=\"left\"><span id=\"DateTimeValue\">not valid</span></td></td><td align=\"right\"><span id=\"RSSIValue\">-100</span></td></tr>\n");
+    response_ += fp_.getHtmlTableEnd();
+    response_ += fp_.getHtmlFieldsetEnd();
 
-    _response += rootFormatProvider.getHtmlFieldset("Power");
-    _response += rootFormatProvider.getHtmlTable();
-    _response += rootFormatProvider.getHtmlTableRowSpan("Input power:", "no data", "PowerValue");
-    _response += rootFormatProvider.getHtmlTableRowText("Intervall:", String(gInverterInterval) + "s");
-	_response += rootFormatProvider.getHtmlTableEnd();
-    _response += rootFormatProvider.getHtmlFieldsetEnd();
+    response_ += fp_.getHtmlFieldset("Power");
+    response_ += fp_.getHtmlTable();
+    response_ += fp_.getHtmlTableRowSpan("Input power:", "no data", "PowerValue");
+    response_ += fp_.getHtmlTableRowText("Intervall:", String(gInverterInterval) + "s");
+	response_ += fp_.getHtmlTableEnd();
+    response_ += fp_.getHtmlFieldsetEnd();
 
-    _response += rootFormatProvider.getHtmlFieldset("Relays");
-    _response += rootFormatProvider.getHtmlTable();
-    Relay* _relay = &Relay1;
-    uint8_t _i = 1;
-    while (_relay != nullptr) {
-        _response += rootFormatProvider.getHtmlTableRowClass(String(_relay->DesignationValue) + ":", "led off", "relay" + String(_i));
-		_relay = (Relay*)_relay->getNext();
-		_i++;
+    response_ += fp_.getHtmlFieldset("Relays");
+    response_ += fp_.getHtmlTable();
+    Relay* relay_ = &Relay1;
+    uint8_t i_ = 1;
+    while (relay_ != nullptr) {
+        response_ += fp_.getHtmlTableRowClass(relay_->getName() + ":", "led off", "relay" + String(i_));
+		relay_ = (Relay*)relay_->getNext();
+		i_++;
 	}
-    _response += rootFormatProvider.getHtmlTableEnd();
-    _response += rootFormatProvider.getHtmlFieldsetEnd();
+    response_ += fp_.getHtmlTableEnd();
+    response_ += fp_.getHtmlFieldsetEnd();
 
-    _response += rootFormatProvider.getHtmlFieldset("Shellys");
-    _response += rootFormatProvider.getHtmlTable();
-    Shelly* _shelly = &Shelly1;
-    _i = 1;
-    while (_shelly != nullptr) {
-        if (_shelly->isActive()) {
-            _response += rootFormatProvider.getHtmlTableRowClass(String(_shelly->DesignationValue) + ":", "led off", "shelly" + String(_i));
+    response_ += fp_.getHtmlFieldset("Shellys");
+    response_ += fp_.getHtmlTable();
+    Shelly* shelly_ = &Shelly1;
+    i_ = 1;
+    while (shelly_ != nullptr) {
+        if (shelly_->isActive()) {
+            response_ += fp_.getHtmlTableRowClass(shelly_->getName() + ":", "led off", "shelly" + String(i_));
         }
-        _shelly = (Shelly*)_shelly->getNext();
-        _i++;
+        shelly_ = (Shelly*)shelly_->getNext();
+        i_++;
     }
-    _response += rootFormatProvider.getHtmlTableEnd();
-    _response += rootFormatProvider.getHtmlFieldsetEnd();
+    response_ += fp_.getHtmlTableEnd();
+    response_ += fp_.getHtmlFieldsetEnd();
 
-    _response += rootFormatProvider.getHtmlFieldset("Network");
-    _response += rootFormatProvider.getHtmlTable();
-    _response += rootFormatProvider.getHtmlTableRowText("MAC Address:", WiFi.macAddress());
-    _response += rootFormatProvider.getHtmlTableRowText("IP Address:", WiFi.localIP().toString().c_str());
-    _response += rootFormatProvider.getHtmlTableEnd();
-    _response += rootFormatProvider.getHtmlFieldsetEnd();
+    response_ += fp_.getHtmlFieldset("Network");
+    response_ += fp_.getHtmlTable();
+    response_ += fp_.getHtmlTableRowText("MAC Address:", WiFi.macAddress());
+    response_ += fp_.getHtmlTableRowText("IP Address:", WiFi.localIP().toString().c_str());
+    response_ += fp_.getHtmlTableEnd();
+    response_ += fp_.getHtmlFieldsetEnd();
 
-    _response += rootFormatProvider.addNewLine(2);
+    response_ += fp_.addNewLine(2);
 
-    _response += rootFormatProvider.getHtmlTable();
-    //_response += rootFormatProvider.getHtmlTableRowSpan("Time:", "not valid", "DateTimeValue");
-    _response += rootFormatProvider.getHtmlTableRowText("Go to <a href = 'config'>configure page</a> to change configuration.");
-    _response += rootFormatProvider.getHtmlTableRowText(rootFormatProvider.getHtmlVersion(Version));
-    _response += rootFormatProvider.getHtmlTableEnd();
+    response_ += fp_.getHtmlTable();
+    //response_ += fp_.getHtmlTableRowSpan("Time:", "not valid", "DateTimeValue");
+    response_ += fp_.getHtmlTableRowText("Go to <a href = 'config'>configure page</a> to change configuration.");
+    response_ += fp_.getHtmlTableRowText(fp_.getHtmlVersion(Version));
+    response_ += fp_.getHtmlTableEnd();
 
-    _response += rootFormatProvider.getHtmlTableColEnd() + rootFormatProvider.getHtmlTableRowEnd();
-    _response += rootFormatProvider.getHtmlTableEnd();
-    _response += rootFormatProvider.getHtmlEnd();
+    response_ += fp_.getHtmlTableColEnd() + fp_.getHtmlTableRowEnd();
+    response_ += fp_.getHtmlTableEnd();
+    response_ += fp_.getHtmlEnd();
 
-    server.send(200, "text/html", _response);
+    server.send(200, "text/html", response_);
 }
 
 void connectWifi(const char* ssid, const char* password) {
