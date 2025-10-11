@@ -37,9 +37,9 @@ void setup() {
 	Serial.println("PV Powerbox v" + String(Version) + " started");
 
 	wifiInit();
-	RelaySetup();
-	ShellySetup();
-	InverterSetup();
+	setupRelays();
+	setupShellys();
+	setupInverter();
 
 	if (gUseNTPServer) {
 		ntpClient.begin(gNTPServer, gTimeZone, 0);
@@ -53,22 +53,22 @@ void loop() {
 	wifiLoop();
 	if (iotWebConf.getState() == iotwebconf::OnLine) {
 
-		InverterLoop();
-		RelayLoop();
-        ShellyLoop();
+		loopInverter();
+		loopRelays();
+        loopShellys();
 
 		if (ntpClient.isInitialized()) {
 			ntpClient.process();
 		}
 	}
 	else {
-		RelayDisableAll();
+		disableAllRelays();
 		// ShellyDisableAll();
 	}
 
 	if (gParamsChanged) {
-		RelaySetup();
-		InverterSetup();
+		setupRelays();
+		setupInverter();
 	}
 
 	gParamsChanged = false;
