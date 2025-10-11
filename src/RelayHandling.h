@@ -9,11 +9,11 @@
 	#include "WProgram.h"
 #endif
 
-void RelaySetup();
+void setupRelays();
 
-void RelayLoop();
+void loopRelays();
 
-void RelayDisableAll();
+void disableAllRelays();
 
 
 #endif

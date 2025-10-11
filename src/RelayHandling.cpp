@@ -6,7 +6,7 @@
 #include "RelayHandling.h"
 #include "webhandling.h"
 
-void RelaySetup() {
+void setupRelays() {
 	Relay* relay_ = &Relay1;
 	while (relay_ != nullptr) {
 		pinMode(relay_->getGPIO(), OUTPUT);
@@ -14,7 +14,7 @@ void RelaySetup() {
 	}
 }
 
-void RelayLoop() {
+void loopRelays() {
 	Relay* relay_ = &Relay1;
 	while (relay_ != nullptr) {
 		relay_->setEnabled((gInputPower > relay_->getPower()));
@@ -30,7 +30,7 @@ void RelayLoop() {
 	}
 }
 
-void RelayDisableAll() {
+void disableAllRelays() {
 	Relay* relay_ = &Relay1;
 	while (relay_ != nullptr) {
 		relay_->setEnabled(false);
