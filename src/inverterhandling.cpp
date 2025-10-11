@@ -33,25 +33,25 @@ void handleData(ModbusMessage response, uint32_t token){
 
     Serial.print("Input power: ");
 
-    int a = int((unsigned char)(response[3]) << 24 |
+    int a_ = int((unsigned char)(response[3]) << 24 |
         (unsigned char)(response[4]) << 16 |
         (unsigned char)(response[5]) << 8 |
         (unsigned char)(response[6]));
 
-    a = a / gInverterInputPowerGain;
+    a_ = a_ / gInverterInputPowerGain;
 
-    Serial.println(a); 
-    gInputPower = a;
+    Serial.println(a_); 
+    gInputPower = a_;
 }
 
 void handleError(Error error, uint32_t token){
     //if (Token != token) { return; };
     // ModbusError wraps the error code and provides a readable error message for it
-    ModbusError me(error);
-    Serial.printf("Error response: %02X - %s\n", (int)me, (const char*)me);
+    ModbusError me_(error);
+    Serial.printf("Error response: %02X - %s\n", (int)me_, (const char*)me_);
 }
 
-void InverterSetup() {
+void setupInverter() {
 
     ModbusClient.onDataHandler(&handleData);
     ModbusClient.onErrorHandler(&handleError);
@@ -60,32 +60,32 @@ void InverterSetup() {
     InverterInterval.start();
 }
 
-void InverterLoop() {
+void loopInverter() {
     if (gParamsChanged) {
         InverterInterval.start(gInverterInterval * 1000);
     }
 
     if (InverterInterval.repeat()) {
-        InverterRequest(gInverterIPAddress, gInverterPort, gInverterInputPowerRegister, gInverterInputPowerDataLength);
+        requestInverter(gInverterIPAddress, gInverterPort, gInverterInputPowerRegister, gInverterInputPowerDataLength);
     }
 }
 
 
-void InverterRequest(String ip, uint16_t port, uint16_t startaddress, uint16_t number ) {
+void requestInverter(String ip, uint16_t port, uint16_t startaddress, uint16_t number ) {
 
-    IPAddress host;
+    IPAddress host_;
 
-    host.fromString(ip);
+    host_.fromString(ip);
 
-    ModbusClient.setTarget(host, port);
+    ModbusClient.setTarget(host_, port);
 
-    uint32_t token = (uint32_t)millis();
-    uint8_t slave = 1;
+    uint32_t token_ = (uint32_t)millis();
+    uint8_t slave_ = 1;
 
-    Error err = ModbusClient.addRequest(token, slave, READ_HOLD_REGISTER, startaddress, number);
-    if (err != SUCCESS) {
-        ModbusError e(err);
-        Serial.printf("Error creating request: %02X - %s\n", (int)e, (const char*)e);
+    Error err_ = ModbusClient.addRequest(token_, slave_, READ_HOLD_REGISTER, startaddress, number);
+    if (err_ != SUCCESS) {
+        ModbusError e_(err_);
+        Serial.printf("Error creating request: %02X - %s\n", (int)e_, (const char*)e_);
     }
 }
 
