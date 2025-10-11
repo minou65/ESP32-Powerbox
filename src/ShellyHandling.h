@@ -9,9 +9,9 @@
 	#include "WProgram.h"
 #endif
 
-extern void ShellySetup();
-extern void ShellyLoop();
-extern void ShellyDisableAll();
+extern void setupShellys();
+extern void loopShellys();
+extern void disableAllShellys();
 
 #endif
 

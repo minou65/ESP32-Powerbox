@@ -27,11 +27,11 @@ void getHTTP(String URL) {
     http.end();
 }
 
-void ShellySetup() {
+void setupShellys() {
     ShellyIntervall.start();
 };
 
-void ShellyLoop() {
+void loopShellys() {
 
     if (!ShellyIntervall.repeat()) { return; }
 
@@ -73,7 +73,7 @@ void ShellyLoop() {
     }
 }
 
-void ShellyDisableAll() {
+void disableAllShellys() {
     Shelly* shelly_ = &Shelly1;
     while (shelly_ != nullptr) {
         if (shelly_->isActive()) {
