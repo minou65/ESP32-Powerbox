@@ -24,7 +24,11 @@ InverterPowerData inverterPowerData;
 InverterStatusData inverterStatusData;
 MeterData meterData;
 
-enum RequestType { REQ_INPUT, REQ_METER, REQ_POWER };
+enum RequestType { 
+    REQ_INVERTER = 1001, 
+    REQ_METER = 1002, 
+    REQ_STATUS = 1003
+};
 struct RequestContext {
     RequestType type;
     uint32_t token;
@@ -43,53 +47,81 @@ int32_t getI32(const ModbusMessage& msg, uint16_t idx) {
 }
 
 void handleMeterData(ModbusMessage response, uint32_t token) {
-    uint16_t idx_ = 3; // Modbus-Daten beginnen ab Index 3
+	Serial.printf("Received meter data, token=%08X\n", token);
+    uint16_t idx_ = 3; // Modbus data starts at index 3
 
     meterData.meterStatus = getU16(response, idx_); idx_ += 2;
-    meterData.gridVoltageA = getI32(response, idx_) / 10; idx_ += 4;
-    meterData.gridVoltageB = getI32(response, idx_) / 10; idx_ += 4;
-    meterData.gridVoltageC = getI32(response, idx_) / 10; idx_ += 4;
-    meterData.gridCurrentA = getI32(response, idx_) / 100; idx_ += 4;
-    meterData.gridCurrentB = getI32(response, idx_) / 100; idx_ += 4;
-    meterData.gridCurrentC = getI32(response, idx_) / 100; idx_ += 4;
-    meterData.activePower = getI32(response, idx_); idx_ += 4;
-    meterData.reactivePower = getI32(response, idx_); idx_ += 4;
-    meterData.powerFactor = getU16(response, idx_) / 1000; idx_ += 2;
-    meterData.gridFrequency = getU16(response, idx_) / 100; idx_ += 2;
-    meterData.positiveActiveElectricity = getI32(response, idx_) / 100; idx_ += 4;
-    meterData.reverseActivePower = getI32(response, idx_) / 100; idx_ += 4;
-    meterData.accumulatedReactivePower = getI32(response, idx_) / 100; idx_ += 4;
+    meterData.gridVoltageA = getI32(response, idx_) / 10.0f; idx_ += 4;
+    meterData.gridVoltageB = getI32(response, idx_) / 10.0f; idx_ += 4;
+    meterData.gridVoltageC = getI32(response, idx_) / 10.0f; idx_ += 4;
+    meterData.gridCurrentA = getI32(response, idx_) / 100.0f; idx_ += 4;
+    meterData.gridCurrentB = getI32(response, idx_) / 100.0f; idx_ += 4;
+    meterData.gridCurrentC = getI32(response, idx_) / 100.0f; idx_ += 4;
+    meterData.activePower = getI32(response, idx_) * 1.0f; idx_ += 4;
+    meterData.reactivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
+    meterData.powerFactor = getU16(response, idx_) / 1000.0f; idx_ += 2;
+    meterData.gridFrequency = getU16(response, idx_) / 100.0f; idx_ += 2;
+    meterData.positiveActiveElectricity = getI32(response, idx_) / 100.0f; idx_ += 4;
+    meterData.reverseActivePower = getI32(response, idx_) / 100.0f; idx_ += 4;
+    meterData.accumulatedReactivePower = getI32(response, idx_) / 100.0f; idx_ += 4;
     meterData.meterType = getU16(response, idx_); idx_ += 2;
-    meterData.abLineVoltage = getI32(response, idx_) / 10; idx_ += 4;
-    meterData.bcLineVoltage = getI32(response, idx_) / 10; idx_ += 4;
-    meterData.caLineVoltage = getI32(response, idx_) / 10; idx_ += 4;
-    meterData.aPhaseActivePower = getI32(response, idx_); idx_ += 4;
-    meterData.bPhaseActivePower = getI32(response, idx_); idx_ += 4;
-    meterData.cPhaseActivePower = getI32(response, idx_); idx_ += 4;
+    meterData.abLineVoltage = getI32(response, idx_) / 10.0f; idx_ += 4;
+    meterData.bcLineVoltage = getI32(response, idx_) / 10.0f; idx_ += 4;
+    meterData.caLineVoltage = getI32(response, idx_) / 10.0f; idx_ += 4;
+    meterData.aPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
+    meterData.bPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
+    meterData.cPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
     meterData.meterModelDetection = getU16(response, idx_);
+
+    Serial.printf("    Meter voltages: A=%.1f V, B=%.1f V, C=%.1f V\n",
+        meterData.gridVoltageA,
+        meterData.gridVoltageB,
+        meterData.gridVoltageC);
+
+    Serial.printf("    Meter currents: A=%.3f A, B=%.3f A, C=%.3f A\n",
+        meterData.gridCurrentA,
+        meterData.gridCurrentB,
+        meterData.gridCurrentC);
+
+    Serial.printf("    Meter active power: %.1f W\n", meterData.activePower);
+    Serial.printf("    Meter reactive power: %.1f Var\n", meterData.reactivePower);
+    Serial.printf("    Meter frequency: %.2f Hz\n", meterData.gridFrequency);
+    Serial.printf("    Meter power factor: %.3f\n", meterData.powerFactor);
 }
 
 void handlePowerData(ModbusMessage response, uint32_t token) {
     Serial.printf("Received inverter power data, token=%08X\n", token);
     uint16_t idx_ = 3;
-    inverterPowerData.inputPower = (float)getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.gridVoltageAB = (float)getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.gridVoltageBC = (float)getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.gridVoltageCA = (float)getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.phaseAVoltage = (float)getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.phaseBVoltage = (float)getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.phaseCVoltage = (float)getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.gridCurrentA = (float)getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.gridCurrentB = (float)getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.gridCurrentC = (float)getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.peakActivePowerDay = (float)getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.activePower = (float)getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.reactivePower = (float)getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.powerFactor = (float)getU16(response, idx_) / 1000.0f;
+    inverterPowerData.inputPower = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    inverterPowerData.gridVoltageAB = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    inverterPowerData.gridVoltageBC = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    inverterPowerData.gridVoltageCA = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    inverterPowerData.phaseAVoltage = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    inverterPowerData.phaseBVoltage = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    inverterPowerData.phaseCVoltage = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    inverterPowerData.gridCurrentA = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    inverterPowerData.gridCurrentB = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    inverterPowerData.gridCurrentC = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    inverterPowerData.peakActivePowerDay = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    inverterPowerData.activePower = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    inverterPowerData.reactivePower = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    inverterPowerData.powerFactor = getU16(response, idx_) / 1000.0f;
+
+    Serial.printf("    Grid currents: A=%.3f A, B=%.3f A, C=%.3f A\n",
+        inverterPowerData.gridCurrentA,
+        inverterPowerData.gridCurrentB,
+        inverterPowerData.gridCurrentC);
+
+    Serial.printf("    Grid voltages: A=%.1f V, B=%.1f V, C=%.1f V\n",
+        inverterPowerData.phaseAVoltage,
+        inverterPowerData.phaseBVoltage,
+        inverterPowerData.phaseCVoltage);
+
+    Serial.printf("    Inverter input power: %.3f kW\n", inverterPowerData.inputPower);
 }
 
 void handleInverterStatusData(ModbusMessage response, uint32_t token) {
-    if (lastRequest.token != token) return;
+    Serial.printf("Received inverter status data, token=%08X\n", token);
     uint16_t idx_ = 3;
 
     inverterStatusData.state1 = getU16(response, idx_); idx_ += 2;
@@ -98,53 +130,46 @@ void handleInverterStatusData(ModbusMessage response, uint32_t token) {
     inverterStatusData.alarm1 = getU16(response, idx_); idx_ += 2;
     inverterStatusData.alarm2 = getU16(response, idx_); idx_ += 2;
     inverterStatusData.alarm3 = getU16(response, idx_);
+
+    Serial.printf("    Inverter states: state1=0x%04X, state2=0x%04X, state3=0x%08X\n",
+        inverterStatusData.state1,
+        inverterStatusData.state2,
+        inverterStatusData.state3);
+
+    Serial.printf("    Inverter alarms: alarm1=0x%04X, alarm2=0x%04X, alarm3=0x%04X\n",
+        inverterStatusData.alarm1,
+        inverterStatusData.alarm2,
+        inverterStatusData.alarm3);
 }
 
 void handleData(ModbusMessage response, uint32_t token){
-       //if (Token != token) { return; };
-
-    //Serial.printf("Response: serverID=%d, FC=%d, Token=%08X, length=%d:\n", response.getServerID(), response.getFunctionCode(), token, response.size());
-    //for (auto& byte : response) {
-    //    Serial.printf("%02X ", byte);
-    //}
-
-    Serial.print("Input power: ");
-
-    int a_ = int((unsigned char)(response[3]) << 24 |
-        (unsigned char)(response[4]) << 16 |
-        (unsigned char)(response[5]) << 8 |
-        (unsigned char)(response[6]));
-
-    a_ = a_ / gInverterInputPowerGain;
-
-    Serial.println(a_); 
-    gInputPower = a_;
+    switch (token) {
+        case REQ_INVERTER:
+            handlePowerData(response, token);
+            break;
+        case REQ_METER:
+            handleMeterData(response, token);
+            break;
+        case REQ_STATUS:
+            handleInverterStatusData(response, token);
+            break;
+        default:
+            Serial.println("Unknown RequestType!");
+            break;
+    }
 }
 
 void handleError(Error error, uint32_t token){
-    //if (Token != token) { return; };
     // ModbusError wraps the error code and provides a readable error message for it
     ModbusError me_(error);
     Serial.printf("Error response: %02X - %s\n", (int)me_, (const char*)me_);
 }
 
-bool testInverterConnection(const char* ip, uint16_t port) {
-    WiFiClient testClient;
-    Serial.printf("Testing connection to %s:%d ...\n", ip, port);
-    if (testClient.connect(ip, port)) {
-        Serial.println("Connection successful!");
-        testClient.stop();
-        return true;
-    }
-    else {
-        Serial.println("Connection failed!");
-        return false;
-    }
-}
-
 void setupInverter() {
     ModbusClient.onErrorHandler(&handleError);
-    ModbusClient.setTimeout(10000, 1000);
+    ModbusClient.setTimeout(2000, 10);
+    ModbusClient.onDataHandler(&handleData);
+	ModbusClient.closeConnectionOnTimeouts(3);
     ModbusClient.begin();
     InverterInterval.start();
 }
@@ -155,65 +180,56 @@ void loopInverter() {
     }
 
     if (InverterInterval.repeat()) {
-        //lastRequest = { REQ_INPUT, millis() };
-        //ModbusClient.onDataHandler(&handleData);
-        //requestInverter(gInverterIPAddress, gInverterPort, gInverterInputPowerRegister, gInverterInputPowerDataLength);
+        requestInverter(
+            gInverterIPAddress, 
+            gInverterPort, 
+            inverterStatusData.startAddress, 
+            inverterStatusData.dataLength, 
+            uint32_t(RequestType::REQ_STATUS)
+		);
 
+        if (inverterStatusData.isStandby()){
+            Serial.println("Inverter is in standby mode, skipping power and meter data request.");
+            //return;
+		}
+        
+        requestInverter(
+            gInverterIPAddress, 
+            gInverterPort, 
+            inverterPowerData.startAddress, 
+            inverterPowerData.dataLength, 
+            uint32_t(RequestType::REQ_INVERTER)
+        );
 
-  //      lastRequest = { REQ_METER, millis() };
-  //      ModbusClient.onDataHandler(&handleMeterData);
-  //      requestInverter(gInverterIPAddress, gInverterPort, 37100, 39);
-
-        lastRequest = { REQ_POWER, millis() };
-        ModbusClient.onDataHandler(&handlePowerData);
-        requestInverter(gInverterIPAddress, gInverterPort, 32064, 21);
-
-		//lastRequest = { REQ_POWER, millis() };
-  //      ModbusClient.onDataHandler(&handleInverterStatusData);
-  //      requestInverter(gInverterIPAddress, gInverterPort, 30000, 7);
-		//// Update global input power variable
-
-		//gInputPower = inverterPowerData.inputPower;
-
-		////Serial.printf("Inverter status: Meter Power=%d W, Inverter Power=%d W\n", meterData.activePower, inverterPowerData.activePower);
-  ////      Serial,printf("Inverter status: State1=%04X, State2=%04X, State3=%08X, Alarm1=%04X, Alarm2=%04X, Alarm3=%04X\n",
-  ////          inverterStatusData.state1, inverterStatusData.state2, inverterStatusData.state3,
-		////	inverterStatusData.alarm1, inverterStatusData.alarm2, inverterStatusData.alarm3);
-		////Serial.printf("Inverter status: Grid Voltage AB=%d V, BC=%d V, CA=%d V\n", 
-  ////          inverterPowerData.gridVoltageAB, inverterPowerData.gridVoltageBC, inverterPowerData.gridVoltageCA);
-		////Serial.printf("Inverter power: %d W\n", gInputPower);
-
-        Serial.printf("Grid voltages: A=%d V, B=%d V, C=%d V\n",
-            inverterPowerData.phaseAVoltage,
-            inverterPowerData.phaseBVoltage,
-            inverterPowerData.phaseCVoltage);
-
-        Serial.printf("Grid currents: A=%d mA, B=%d mA, C=%d mA\n",
-            inverterPowerData.gridCurrentA,
-            inverterPowerData.gridCurrentB,
-            inverterPowerData.gridCurrentC);
-
-		Serial.printf("Inverter input power: %d W\n", inverterPowerData.inputPower);
-
+        requestInverter(
+            gInverterIPAddress,
+            gInverterPort,
+            meterData.startAddress,
+            meterData.dataLength,
+            uint32_t(RequestType::REQ_METER)
+		);
     }
 }
 
 
-void requestInverter(String ip, uint16_t port, uint16_t startaddress, uint16_t number ) {
-
+void requestInverter(const String ip, uint16_t port, uint16_t startaddress, uint16_t number, uint32_t token) {
     IPAddress host_;
-    host_.fromString(ip);
+    if (!host_.fromString(ip)) {
+        Serial.printf("Invalid IP address: %s\n", ip.c_str());
+        return;
+    }
     ModbusClient.setTarget(host_, port);
-
-    uint32_t token_ = (uint32_t)millis();
     uint8_t slave_ = 1;
 
-    Error err_ = ModbusClient.addRequest(token_, slave_, READ_HOLD_REGISTER, startaddress, number);
+    Error err_ = ModbusClient.addRequest(token, slave_, READ_HOLD_REGISTER, startaddress, number);
     if (err_ != SUCCESS) {
         ModbusError e_(err_);
         Serial.printf("Error creating request: %02X - %s\n", (int)e_, (const char*)e_);
     }
-	Serial.printf("Sent request to inverter at %s:%d, startaddress=%d, number=%d, token=%08X\n", ip.c_str(), port, startaddress, number, token_);
+    else {
+        Serial.printf("Request sent to inverter at %s:%d, start address=%d, count=%d, token=%08X\n",
+            ip.c_str(), port, startaddress, number, token);
+    }
 }
 
 
