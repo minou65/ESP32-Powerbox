@@ -68,7 +68,7 @@ void loop() {
 
 	if (gParamsChanged) {
 		setupRelays();
-		setupInverter();
+		//setupInverter();
 	}
 
 	gParamsChanged = false;
