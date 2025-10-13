@@ -16,13 +16,8 @@
 
 extern char Version[];
 
-extern int gInputPower;
-
 extern char gInverterIPAddress[15];
 extern int gInverterPort;
-extern uint16_t gInverterInputPowerRegister;
-extern uint8_t gInverterInputPowerDataLength;
-extern uint16_t gInverterInputPowerGain;
 extern uint8_t gInverterInterval;
 
 extern bool gParamsChanged;
