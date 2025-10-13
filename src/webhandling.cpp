@@ -7,24 +7,22 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <WiFi.h>
-
 #include <time.h>
-
 #include <DNSServer.h>
-#include<iostream>
-#include <string.h>
 
 #include <IotWebConf.h>
-#include <IotWebConfUsing.h> // This loads aliases for easier class names.
+#include <IotWebRoot.h>
+#include <IotWebConfUsing.h>
 #include <IotWebConfTParameter.h>
-# include <IotWebConfESP32HTTPUpdateServer.h>
+#include <IotWebConfESP32HTTPUpdateServer.h>
+
 #include "common.h"
 #include "webhandling.h"
 #include "favicon.h"
-#include <IotWebRoot.h>
+#include "inverterhandling.h"
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "A4"
+#define CONFIG_VERSION "A5"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -89,33 +87,6 @@ iotwebconf::UIntTParameter<uint16_t> InverterPort =
     iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("InverterPort").
     label("Port").
     defaultValue(502).
-    min(1u).
-    step(1).
-    placeholder("1..65535").
-    build();
-
-iotwebconf::UIntTParameter<uint16_t> InverterInputPowerRegister =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("InverterInputPowerRegister").
-    label("Register Input power").
-    defaultValue(32064).
-    min(1u).
-    step(1).
-    placeholder("1..65535").
-    build();
-
-iotwebconf::UIntTParameter<uint8_t> InverterInputPowerDataLength =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint8_t>>("InverterInputPowerDataLength").
-    label("Data Length").
-    defaultValue(2).
-    min(1u).
-    step(1).
-    placeholder("1..255").
-    build();
-
-iotwebconf::UIntTParameter<uint16_t> InverterInputPowerGain =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("InverterInputPowerGain").
-    label("Gain").
-    defaultValue(1).
     min(1u).
     step(1).
     placeholder("1..65535").
@@ -186,9 +157,6 @@ void wifiInit() {
 
     sysConfGroup.addItem(&InverterIPAddress);
     sysConfGroup.addItem(&InverterPort);
-    sysConfGroup.addItem(&InverterInputPowerRegister);
-    sysConfGroup.addItem(&InverterInputPowerDataLength);
-    sysConfGroup.addItem(&InverterInputPowerGain);
     sysConfGroup.addItem(&InverterActivePowerInterval);
 
     iotWebConf.addParameterGroup(&sysConfGroup);
@@ -274,14 +242,43 @@ void handleDateTime() {
 }
 
 void handlePower() {
-    server.send(200, "text/plain", String(gInputPower));
+    server.send(200, "text/plain", String(inverterPowerData.inputPower * 1000, 0));
 }
 
 void handleData() {
     String json_ = "{";
-    
-    json_ += "\"Power\":\"" + String(gInputPower) + "\"";
-    json_ += ",\"RSSI\":\"" + String(WiFi.RSSI()) + "\"";
+    json_ += "\"RSSI\":\"" + String(WiFi.RSSI()) + "\"";
+
+    // Grid node
+    json_ += ",\"Grid\":{";
+    json_ += "\"VoltageA\":\"" + String(meterData.gridVoltageA, 1) + "\"";
+    json_ += ",\"VoltageB\":\"" + String(meterData.gridVoltageB, 1) + "\"";
+    json_ += ",\"VoltageC\":\"" + String(meterData.gridVoltageC, 1) + "\"";
+    json_ += ",\"CurrentA\":\"" + String(meterData.gridCurrentA, 3) + "\"";
+    json_ += ",\"CurrentB\":\"" + String(meterData.gridCurrentB, 3) + "\"";
+    json_ += ",\"CurrentC\":\"" + String(meterData.gridCurrentC, 3) + "\"";
+    json_ += ",\"Frequency\":\"" + String(meterData.gridFrequency, 2) + "\"";
+    json_ += ",\"PowerFactor\":\"" + String(meterData.powerFactor, 3) + "\"";
+	json_ += ",\"ActivePower\":\"" + String(meterData.activePower, 0) + "\"";
+	json_ += ",\"ReactivePower\":\"" + String(meterData.reactivePower, 0) + "\"";
+    json_ += "}";
+
+    // Inverter node
+    json_ += ",\"Inverter\":{";
+    json_ += "\"InputPower\":\"" + String(inverterPowerData.inputPower * 1000, 0) + "\"";
+    json_ += ",\"ActivePower\":\"" + String(inverterPowerData.activePower * 1000, 0) + "\"";
+    json_ += ",\"ReactivePower\":\"" + String(inverterPowerData.reactivePower * 1000, 0) + "\"";
+    json_ += ",\"GridVoltageAB\":\"" + String(inverterPowerData.gridVoltageAB, 1) + "\"";
+    json_ += ",\"GridVoltageBC\":\"" + String(inverterPowerData.gridVoltageBC, 1) + "\"";
+    json_ += ",\"GridVoltageCA\":\"" + String(inverterPowerData.gridVoltageCA, 1) + "\"";
+    json_ += ",\"GridCurrentA\":\"" + String(inverterPowerData.gridCurrentA, 3) + "\"";
+    json_ += ",\"GridCurrentB\":\"" + String(inverterPowerData.gridCurrentB, 3) + "\"";
+    json_ += ",\"GridCurrentC\":\"" + String(inverterPowerData.gridCurrentC, 3) + "\"";
+    json_ += ",\"PowerFactor\":\"" + String(inverterPowerData.powerFactor, 3) + "\"";
+    json_ += ",\"Standby\":\"" + String(inverterStatusData.isStandby() ? "Yes" : "No") + "\"";
+    json_ += "}";
+
+	// Relay node
     json_ += ",\"Relays\":{";
     Relay* relay_ = &Relay1;
     uint8_t i_ = 1;
@@ -301,15 +298,16 @@ void handleData() {
     }
     json_ += "}";
 
+	// Shelly node
     json_ += ",\"Shellys\":{";
     Shelly* shelly_ = &Shelly1;
     i_ = 1;
     while (shelly_ != nullptr) {
         if (shelly_->isActive()) {
-            if(shelly_->isEnabled() && (gInputPower > shelly_->getPower())) {
+            if(shelly_->isEnabled() && (inverterPowerData.inputPower * 1000 > shelly_->getPower())) {
 				json_ += "\"shelly" + String(i_) + "\":\"On\"";
 			}
-			else if (shelly_->isEnabled() && (gInputPower <= shelly_->getPower())) {
+			else if (shelly_->isEnabled() && (inverterPowerData.inputPower * 1000 <= shelly_->getPower())) {
 				json_ += "\"shelly" + String(i_) + "\":\"DelayedOff\"";
 			}
 			else {
@@ -386,8 +384,19 @@ protected:
         s_ += F("}\n");
 
         s_ += F("function updateData(jsonData) {\n");
-        s_ += F("   document.getElementById('PowerValue').innerHTML = jsonData.Power + \"W\" \n");
         s_ += F("   document.getElementById('RSSIValue').innerHTML = jsonData.RSSI + \"dBm\" \n");
+
+		s_ += F("   document.getElementById('gridVoltageA').innerHTML = jsonData.Grid.VoltageA + \"V\" \n");
+		s_ += F("   document.getElementById('gridVoltageB').innerHTML = jsonData.Grid.VoltageB + \"V\" \n");
+		s_ += F("   document.getElementById('gridVoltageC').innerHTML = jsonData.Grid.VoltageC + \"V\" \n");
+		s_ += F("   document.getElementById('gridCurrentA').innerHTML = jsonData.Grid.CurrentA + \"A\" \n");
+		s_ += F("   document.getElementById('gridCurrentB').innerHTML = jsonData.Grid.CurrentB + \"A\" \n");
+		s_ += F("   document.getElementById('gridCurrentC').innerHTML = jsonData.Grid.CurrentC + \"A\" \n");
+		s_ += F("   document.getElementById('gridActivePower').innerHTML = jsonData.Grid.ActivePower + \"W\" \n");
+
+		s_ += F("   document.getElementById('inverterStandby').innerHTML = jsonData.Inverter.Standby \n");
+		s_ += F("   document.getElementById('inverterInputPower').innerHTML = jsonData.Inverter.InputPower + \"W\" \n");
+		s_ += F("   document.getElementById('inverterActivePower').innerHTML = jsonData.Inverter.ActivePower + \"W\" \n");
 
         s_ += F("   updateLED(document.getElementById('relay1'), jsonData.Relays.relay1.toLowerCase());\n");
         s_ += F("   updateLED(document.getElementById('relay2'), jsonData.Relays.relay2.toLowerCase());\n");
@@ -434,11 +443,28 @@ void handleRoot() {
     response_ += fp_.getHtmlTableEnd();
     response_ += fp_.getHtmlFieldsetEnd();
 
-    response_ += fp_.getHtmlFieldset("Power");
+    response_ += fp_.getHtmlFieldset("Grid");
     response_ += fp_.getHtmlTable();
-    response_ += fp_.getHtmlTableRowSpan("Input power:", "no data", "PowerValue");
-    response_ += fp_.getHtmlTableRowText("Intervall:", String(gInverterInterval) + "s");
-	response_ += fp_.getHtmlTableEnd();
+    response_ += fp_.getHtmlTableRowSpan("Voltage A:", "no data", "gridVoltageA");
+    response_ += fp_.getHtmlTableRowSpan("Voltage B:", "no data", "gridVoltageB");
+    response_ += fp_.getHtmlTableRowSpan("Voltage C:", "no data", "gridVoltageC");
+    response_ += fp_.getHtmlTableRowSpan("Current A:", "no data", "gridCurrentA");
+    response_ += fp_.getHtmlTableRowSpan("Current B:", "no data", "gridCurrentB");
+    response_ += fp_.getHtmlTableRowSpan("Current C:", "no data", "gridCurrentC");
+    response_ += fp_.getHtmlTableRowSpan("Active Power:", "no data", "gridActivePower");
+    response_ += fp_.getHtmlTableRowText(">0: feed-in to the power grid.", "");
+	response_ += fp_.getHtmlTableRowText("<0: consumption from the power grid.", "");
+
+    response_ += fp_.getHtmlTableEnd();
+    response_ += fp_.getHtmlFieldsetEnd();
+
+    response_ += fp_.getHtmlFieldset("Inverter");
+    response_ += fp_.getHtmlTable();
+    response_ += fp_.getHtmlTableRowText("Polling intervall:", String(gInverterInterval) + "s");
+    response_ += fp_.getHtmlTableRowSpan("Standby:", "no data", "inverterStandby");
+    response_ += fp_.getHtmlTableRowSpan("Input Power:", "no data", "inverterInputPower");
+    response_ += fp_.getHtmlTableRowSpan("Active Power:", "no data", "inverterActivePower");
+    response_ += fp_.getHtmlTableEnd();
     response_ += fp_.getHtmlFieldsetEnd();
 
     response_ += fp_.getHtmlFieldset("Relays");
@@ -503,9 +529,6 @@ iotwebconf::WifiAuthInfo* handleConnectWifiFailure() {
 void convertParams() {
     strcpy(gInverterIPAddress, InverterIPAddress.value());
     gInverterPort = InverterPort.value();
-    gInverterInputPowerRegister = InverterInputPowerRegister.value();
-    gInverterInputPowerDataLength = InverterInputPowerDataLength.value();
-    gInverterInputPowerGain = InverterInputPowerGain.value();
     gInverterInterval = InverterActivePowerInterval.value();
 }
 
