@@ -2,6 +2,7 @@
 #include <HTTPClient.h>
 #include "common.h"
 #include "webhandling.h"
+#include "inverterhandling.h"
 
 HTTPClient http;
 
@@ -49,8 +50,7 @@ void loopShellys() {
     while (shelly_ != nullptr) {
         if (shelly_->isActive()) {
 
-            // Zeitvergleich: String-Vergleich ist robust, wenn beide im Format "HH:MM" sind
-            enabled_ = (gInputPower > shelly_->getPower()) && (currentTime_ >= shelly_->TimeValue());
+            enabled_ = (inverterPowerData.inputPower * 1000 > shelly_->getPower()) && (currentTime_ >= shelly_->TimeValue());
 
             if (enabled_) {
                 if (!shelly_->isEnabled()) {
