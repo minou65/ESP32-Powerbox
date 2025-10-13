@@ -4,21 +4,16 @@
 
 // Includes: <Arduino.h> for Serial etc., EThernet.h for Ethernet support
 #include <Arduino.h>
-#include <SPI.h>
 #include <WiFi.h>
+#include <ModbusClientTCP.h>
 #include "common.h"
 #include "inverterhandling.h"
 #include "webhandling.h"
-#include <ModbusClientTCP.h>
 
-int gInputPower = 0;
 uint8_t gInverterInterval = 10;
 
 char gInverterIPAddress[15] = "0.0.0.0";
 int gInverterPort = 502;
-uint16_t gInverterInputPowerRegister = 32064;
-uint8_t gInverterInputPowerDataLength = 2;
-uint16_t gInverterInputPowerGain = 1;
 
 InverterPowerData inverterPowerData;
 InverterStatusData inverterStatusData;
