@@ -18,7 +18,9 @@ void setupRelays() {
 void loopRelays() {
 	Relay* relay_ = &Relay1;
 	while (relay_ != nullptr) {
-		relay_->setEnabled((inverterPowerData.inputPower * 1000 > relay_->getPower()));
+		uint32_t relayPower_ = relay_->getPower();
+		bool enableRelay_ = (inverterPowerData.inputPower * 1000 > relayPower_) && (relayPower_ > 0);
+		relay_->setEnabled(enableRelay_);
 
 		if (relay_->isEnabled()) {
 			digitalWrite(relay_->getGPIO(), HIGH);
