@@ -5,6 +5,7 @@
 #include "common.h"
 #include "RelayHandling.h"
 #include "webhandling.h"
+#include "inverterhandling.h"
 
 void setupRelays() {
 	Relay* relay_ = &Relay1;
@@ -17,7 +18,7 @@ void setupRelays() {
 void loopRelays() {
 	Relay* relay_ = &Relay1;
 	while (relay_ != nullptr) {
-		relay_->setEnabled((gInputPower > relay_->getPower()));
+		relay_->setEnabled((inverterPowerData.inputPower * 1000 > relay_->getPower()));
 
 		if (relay_->isEnabled()) {
 			digitalWrite(relay_->getGPIO(), HIGH);
