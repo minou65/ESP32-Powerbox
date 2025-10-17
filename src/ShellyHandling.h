@@ -10,7 +10,6 @@
 #endif
 
 extern void setupShellys();
-extern void loopShellys();
 extern void disableAllShellys();
 
 #endif
