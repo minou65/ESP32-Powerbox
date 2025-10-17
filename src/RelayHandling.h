@@ -10,11 +10,7 @@
 #endif
 
 void setupRelays();
-
-void loopRelays();
-
 void disableAllRelays();
-
 
 #endif
 
