@@ -51,16 +51,111 @@ void setup() {
 
 void loop() {
 	wifiLoop();
-	if (iotWebConf.getState() == iotwebconf::OnLine) {
+    if (iotWebConf.getState() == iotwebconf::OnLine) {
 
 		loopInverter();
-		loopRelays();
-        loopShellys();
 
-		if (ntpClient.isInitialized()) {
-			ntpClient.process();
-		}
-	}
+        float inverterActivePower_ = inverterPowerData.activePower * 1000; // kW to W
+        float gridPower_ = meterData.activePower; // W
+
+        // Calculate total power of enabled consumers
+        float totalConsumerLoad_ = 0;
+        for (Consumer* c_ : consumers) {
+            if (c_->isEnabled() && c_->isActive()) {
+                totalConsumerLoad_ += c_->getPower();
+            }
+        }
+
+        // Calculate available PV power
+        // Note: In the inverter, gridPower_ > 0 means feed-in, gridPower_ < 0 means grid consumption!
+        float availablePVPower_;
+        if (gridPower_ > 0) {
+            // When power is being fed into the grid (gridPower_ > 0), the available PV surplus for additional consumers
+            // is calculated as the inverter's active power minus the power fed into the grid and minus the current consumer load.
+            // This ensures that only the actual surplus (which would otherwise be exported) is used for enabling more consumers.
+            availablePVPower_ = inverterActivePower_ - gridPower_ - totalConsumerLoad_;
+        }
+        else {
+            // Power is being drawn from the grid or balanced: no PV surplus available
+            availablePVPower_ = 0;
+        }
+
+        //Serial.println("----");
+        //Serial.print("Inverter active power: "); Serial.print(inverterActivePower_); Serial.println(" W, ");
+        //Serial.print("    Grid power: "); Serial.print(gridPower_); Serial.println(" W, ");
+        //Serial.print("    Total consumer load: "); Serial.print(totalConsumerLoad_); Serial.println(" W, ");
+        //Serial.print("    Available PV power: "); Serial.print(availablePVPower_); Serial.println(" W");
+
+
+        // Enable consumers by priority
+        float remainingPVPower_ = availablePVPower_;
+        for (Consumer* c_ : consumers) {
+            if (!c_->isEnabled() && c_->isActive() && c_->getPower() <= remainingPVPower_) {
+                c_->setEnabled(true);
+                Serial.printf("Enabled consumer: %s, with a load of %d W\n", c_->getName().c_str(), c_->getPower());
+                remainingPVPower_ -= c_->getPower();
+                Serial.print("    Remaining PV power: "); Serial.print(remainingPVPower_); Serial.println(" W");
+            }
+        }
+
+        // Try to enable higher-priority consumers by disabling lower-priority ones
+        for (size_t i = 0; i < consumers.size(); ++i) {
+            Consumer* highPrio_ = consumers[i];
+            if (!highPrio_->isEnabled() && highPrio_->isActive()) {
+                uint32_t requiredPower_ = highPrio_->getPower();
+                uint32_t availablePower_ = availablePVPower_;
+                std::vector<size_t> toDisable_;
+                // Collect enabled lower-priority consumers
+                for (size_t j = consumers.size(); j > i; --j) {
+                    Consumer* lowPrio_ = consumers[j - 1];
+                    if (lowPrio_->isEnabled() && lowPrio_->isActive()) {
+                        availablePower_ += lowPrio_->getPower();
+                        toDisable_.push_back(j - 1);
+                        if (availablePower_ >= requiredPower_) break;
+                    }
+                }
+                // If enough power can be freed, switch
+                if (availablePower_ >= requiredPower_) {
+                    for (size_t idx_ : toDisable_) {
+                        consumers[idx_]->setEnabled(false);
+                    }
+                    highPrio_->setEnabled(true);
+                    break; // Only one switch per loop
+                }
+            }
+        }
+
+        // Recalculate used power
+        float usedPower_ = 0;
+        for (Consumer* c_ : consumers) {
+            if (c_->isEnabled() && c_->isActive()) {
+                usedPower_ += c_->getPower();
+            }
+        }
+
+        // If too much power is used, disable consumers with lowest priority (from the end)
+        float maxPVPower_ = inverterActivePower_ - gridPower_;
+        if (usedPower_ > maxPVPower_) {
+            for (auto it_ = consumers.rbegin(); it_ != consumers.rend() && usedPower_ > maxPVPower_; ++it_) {
+                Consumer* c_ = *it_;
+                if (c_->isEnabled() && c_->isActive()) {
+                    c_->setEnabled(false);
+                    usedPower_ -= c_->getPower();
+					Serial.printf("Disabled consumer: %s, with a load of %d W\n", c_->getName().c_str(), c_->getPower());
+					Serial.print("    New used power: "); Serial.print(usedPower_); Serial.println(" W");
+                }
+            }
+        }
+
+        // For each consumer, call process
+        for (Consumer* c_ : consumers) {
+            c_->process();
+        }
+
+        if (ntpClient.isInitialized()) {
+            ntpClient.process();
+        }
+    }
 	else {
 		disableAllRelays();
 		// ShellyDisableAll();
