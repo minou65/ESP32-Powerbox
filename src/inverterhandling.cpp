@@ -1,11 +1,7 @@
-// 
-// 
-// 
-
-// Includes: <Arduino.h> for Serial etc., EThernet.h for Ethernet support
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ModbusClientTCP.h>
+#include <esp_log.h>
 #include "common.h"
 #include "inverterhandling.h"
 #include "webhandling.h"
@@ -19,13 +15,13 @@ InverterPowerData inverterPowerData;
 InverterStatusData inverterStatusData;
 MeterData meterData;
 
-enum RequestType { 
-    REQ_INVERTER = 1001, 
-    REQ_METER = 1002, 
-    REQ_STATUS = 1003
+enum REQUEST_TYPE { 
+    REQUEST_TYPE_INVERTER = 1001,
+    REQUEST_TYPE_METER = 1002,
+    REQUEST_TYPE_STATUS = 1003
 };
 struct RequestContext {
-    RequestType type;
+    REQUEST_TYPE type;
     uint32_t token;
 };
 RequestContext lastRequest;
@@ -42,7 +38,7 @@ int32_t getI32(const ModbusMessage& msg, uint16_t idx) {
 }
 
 void handleMeterData(ModbusMessage response, uint32_t token) {
-	Serial.printf("Received meter data, token=%08X\n", token);
+    ESP_LOGI("INVERTER", "Received meter data, token=%08X", token);
     uint16_t idx_ = 3; // Modbus data starts at index 3
 
     meterData.meterStatus = getU16(response, idx_); idx_ += 2;
@@ -68,24 +64,24 @@ void handleMeterData(ModbusMessage response, uint32_t token) {
     meterData.cPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
     meterData.meterModelDetection = getU16(response, idx_);
 
-    Serial.printf("    Meter voltages: A=%.1f V, B=%.1f V, C=%.1f V\n",
+    ESP_LOGI("INVERTER", "    Meter voltages: A=%.1f V, B=%.1f V, C=%.1f V",
         meterData.gridVoltageA,
         meterData.gridVoltageB,
         meterData.gridVoltageC);
 
-    Serial.printf("    Meter currents: A=%.3f A, B=%.3f A, C=%.3f A\n",
+    ESP_LOGI("INVERTER", "    Meter currents: A=%.3f A, B=%.3f A, C=%.3f A",
         meterData.gridCurrentA,
         meterData.gridCurrentB,
         meterData.gridCurrentC);
 
-    Serial.printf("    Meter active power: %.1f W\n", meterData.activePower);
-    Serial.printf("    Meter reactive power: %.1f Var\n", meterData.reactivePower);
-    Serial.printf("    Meter frequency: %.2f Hz\n", meterData.gridFrequency);
-    Serial.printf("    Meter power factor: %.3f\n", meterData.powerFactor);
+    ESP_LOGI("INVERTER", "    Meter active power: %.1f W", meterData.activePower);
+    ESP_LOGI("INVERTER", "    Meter reactive power: %.1f Var", meterData.reactivePower);
+    ESP_LOGI("INVERTER", "    Meter frequency: %.2f Hz", meterData.gridFrequency);
+    ESP_LOGI("INVERTER", "    Meter power factor: %.3f", meterData.powerFactor);
 }
 
 void handlePowerData(ModbusMessage response, uint32_t token) {
-    Serial.printf("Received inverter power data, token=%08X\n", token);
+    ESP_LOGI("INVERTER", "Received inverter power data, token=%08X", token);
     uint16_t idx_ = 3;
     inverterPowerData.inputPower = getI32(response, idx_) / 1000.0f; idx_ += 4;
     inverterPowerData.gridVoltageAB = getU16(response, idx_) / 10.0f;   idx_ += 2;
@@ -102,21 +98,21 @@ void handlePowerData(ModbusMessage response, uint32_t token) {
     inverterPowerData.reactivePower = getI32(response, idx_) / 1000.0f; idx_ += 4;
     inverterPowerData.powerFactor = getU16(response, idx_) / 1000.0f;
 
-    Serial.printf("    Grid currents: A=%.3f A, B=%.3f A, C=%.3f A\n",
+    ESP_LOGI("INVERTER", "    Grid currents: A=%.3f A, B=%.3f A, C=%.3f A",
         inverterPowerData.gridCurrentA,
         inverterPowerData.gridCurrentB,
         inverterPowerData.gridCurrentC);
 
-    Serial.printf("    Grid voltages: A=%.1f V, B=%.1f V, C=%.1f V\n",
+    ESP_LOGI("INVERTER", "    Grid voltages: A=%.1f V, B=%.1f V, C=%.1f V",
         inverterPowerData.phaseAVoltage,
         inverterPowerData.phaseBVoltage,
         inverterPowerData.phaseCVoltage);
 
-    Serial.printf("    Inverter input power: %.3f kW\n", inverterPowerData.inputPower);
+    ESP_LOGI("INVERTER", "    Inverter input power: %.3f kW", inverterPowerData.inputPower);
 }
 
 void handleInverterStatusData(ModbusMessage response, uint32_t token) {
-    Serial.printf("Received inverter status data, token=%08X\n", token);
+    ESP_LOGI("INVERTER", "Received inverter status data, token=%08X", token);
     uint16_t idx_ = 3;
 
     inverterStatusData.state1 = getU16(response, idx_); idx_ += 2;
@@ -126,38 +122,57 @@ void handleInverterStatusData(ModbusMessage response, uint32_t token) {
     inverterStatusData.alarm2 = getU16(response, idx_); idx_ += 2;
     inverterStatusData.alarm3 = getU16(response, idx_);
 
-    Serial.printf("    Inverter states: state1=0x%04X, state2=0x%04X, state3=0x%08X\n",
+    ESP_LOGI("INVERTER", "    Inverter states: state1=0x%04X, state2=0x%04X, state3=0x%08X",
         inverterStatusData.state1,
         inverterStatusData.state2,
         inverterStatusData.state3);
 
-    Serial.printf("    Inverter alarms: alarm1=0x%04X, alarm2=0x%04X, alarm3=0x%04X\n",
+    ESP_LOGI("INVERTER", "    Inverter alarms: alarm1=0x%04X, alarm2=0x%04X, alarm3=0x%04X",
         inverterStatusData.alarm1,
         inverterStatusData.alarm2,
         inverterStatusData.alarm3);
 }
 
-void handleData(ModbusMessage response, uint32_t token){
+void handleData(ModbusMessage response, uint32_t token) {
     switch (token) {
-        case REQ_INVERTER:
-            handlePowerData(response, token);
-            break;
-        case REQ_METER:
-            handleMeterData(response, token);
-            break;
-        case REQ_STATUS:
-            handleInverterStatusData(response, token);
-            break;
-        default:
-            Serial.println("Unknown RequestType!");
-            break;
+    case REQUEST_TYPE_INVERTER:
+        handlePowerData(response, token);
+        break;
+    case REQUEST_TYPE_METER:
+        handleMeterData(response, token);
+        break;
+    case REQUEST_TYPE_STATUS:
+        handleInverterStatusData(response, token);
+        break;
+    default:
+        ESP_LOGW("INVERTER", "Unknown REQUEST_TYPE!");
+        break;
     }
 }
 
-void handleError(Error error, uint32_t token){
-    // ModbusError wraps the error code and provides a readable error message for it
+void handleError(Error error, uint32_t token) {
     ModbusError me_(error);
-    Serial.printf("Error response: %02X - %s\n", (int)me_, (const char*)me_);
+    ESP_LOGE("INVERTER", "Error response: %02X - %s", (int)me_, (const char*)me_);
+}
+
+void requestInverter(const String ipAddress, uint16_t port, uint16_t startaddress, uint16_t registerCount, uint32_t token) {
+    IPAddress host_;
+    if (!host_.fromString(ipAddress)) {
+        ESP_LOGE("INVERTER", "Invalid IP address: %s", ipAddress.c_str());
+        return;
+    }
+    ModbusClient.setTarget(host_, port);
+    uint8_t slave_ = 1;
+
+    Error err_ = ModbusClient.addRequest(token, slave_, READ_HOLD_REGISTER, startaddress, registerCount);
+    if (err_ != SUCCESS) {
+        ModbusError e_(err_);
+        ESP_LOGE("INVERTER", "Error creating request: %02X - %s", (int)e_, (const char*)e_);
+    }
+    else {
+        ESP_LOGI("INVERTER", "Request sent to inverter at %s:%d, start address=%d, count=%d, token=%08X",
+            ip.c_str(), port, startaddress, registerCount, token);
+    }
 }
 
 void setupInverter() {
@@ -180,12 +195,11 @@ void loopInverter() {
             gInverterPort, 
             inverterStatusData.startAddress, 
             inverterStatusData.dataLength, 
-            uint32_t(RequestType::REQ_STATUS)
+            uint32_t(REQUEST_TYPE_STATUS)
 		);
 
         if (inverterStatusData.isStandby()){
-            Serial.println("Inverter is in standby mode, skipping power and meter data request.");
-            //return;
+            // Serial.println("Inverter is in standby mode, skipping power and meter data request.");
 		}
         
         requestInverter(
@@ -193,7 +207,7 @@ void loopInverter() {
             gInverterPort, 
             inverterPowerData.startAddress, 
             inverterPowerData.dataLength, 
-            uint32_t(RequestType::REQ_INVERTER)
+            uint32_t(REQUEST_TYPE_INVERTER)
         );
 
         requestInverter(
@@ -201,29 +215,8 @@ void loopInverter() {
             gInverterPort,
             meterData.startAddress,
             meterData.dataLength,
-            uint32_t(RequestType::REQ_METER)
+            uint32_t(REQUEST_TYPE_METER)
 		);
-    }
-}
-
-
-void requestInverter(const String ip, uint16_t port, uint16_t startaddress, uint16_t number, uint32_t token) {
-    IPAddress host_;
-    if (!host_.fromString(ip)) {
-        Serial.printf("Invalid IP address: %s\n", ip.c_str());
-        return;
-    }
-    ModbusClient.setTarget(host_, port);
-    uint8_t slave_ = 1;
-
-    Error err_ = ModbusClient.addRequest(token, slave_, READ_HOLD_REGISTER, startaddress, number);
-    if (err_ != SUCCESS) {
-        ModbusError e_(err_);
-        Serial.printf("Error creating request: %02X - %s\n", (int)e_, (const char*)e_);
-    }
-    else {
-        Serial.printf("Request sent to inverter at %s:%d, start address=%d, count=%d, token=%08X\n",
-            ip.c_str(), port, startaddress, number, token);
     }
 }
 
