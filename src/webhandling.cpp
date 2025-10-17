@@ -58,6 +58,12 @@ bool startAPMode = true;
 DNSServer dnsServer;
 WebServer server(80);
 
+std::vector<Consumer*> consumers = {
+    &Relay1, &Relay2, &Relay3, &Relay4,
+    &Shelly1, &Shelly2, &Shelly3, &Shelly4, &Shelly5, &Shelly6, &Shelly7, &Shelly8, &Shelly9, &Shelly10
+};
+
+
 class CustomHtmlFormatProvider : public iotwebconf::OptionalGroupHtmlFormatProvider {
 protected:
     virtual String getFormEnd() {
@@ -391,13 +397,19 @@ protected:
 		s_ += F("   document.getElementById('gridActivePower').innerHTML = jsonData.Grid.ActivePower + \"W\" \n");
 
 		s_ += F("   document.getElementById('inverterStandby').innerHTML = jsonData.Inverter.Standby \n");
-		s_ += F("   document.getElementById('inverterInputPower').innerHTML = jsonData.Inverter.InputPower + \"W\" \n");
 		s_ += F("   document.getElementById('inverterActivePower').innerHTML = jsonData.Inverter.ActivePower + \"W\" \n");
 
         s_ += F("   updateLED(document.getElementById('relay1'), jsonData.Relays.relay1.toLowerCase());\n");
         s_ += F("   updateLED(document.getElementById('relay2'), jsonData.Relays.relay2.toLowerCase());\n");
         s_ += F("   updateLED(document.getElementById('relay3'), jsonData.Relays.relay3.toLowerCase());\n");
         s_ += F("   updateLED(document.getElementById('relay4'), jsonData.Relays.relay4.toLowerCase());\n");
+
+        // Set grid power direction
+        s_ += F("   if (parseFloat(jsonData.Grid.ActivePower) > 0) {\n");
+        s_ += F("       document.getElementById('gridPowerDirection').innerHTML = \"to Grid\";\n");
+        s_ += F("   } else {\n");
+        s_ += F("       document.getElementById('gridPowerDirection').innerHTML = \"from Grid\";\n");
+        s_ += F("   }\n");
 
         Shelly* shelly_ = &Shelly1;
         uint8_t i_ = 1;
@@ -448,8 +460,7 @@ void handleRoot() {
     response_ += fp_.getHtmlTableRowSpan("Current B:", "no data", "gridCurrentB");
     response_ += fp_.getHtmlTableRowSpan("Current C:", "no data", "gridCurrentC");
     response_ += fp_.getHtmlTableRowSpan("Active Power:", "no data", "gridActivePower");
-    response_ += fp_.getHtmlTableRowText(">0: feed-in to the power grid.", "");
-	response_ += fp_.getHtmlTableRowText("<0: consumption from the power grid.", "");
+    response_ += fp_.getHtmlTableRowSpan("Power Direction:", "no data", "gridPowerDirection");
 
     response_ += fp_.getHtmlTableEnd();
     response_ += fp_.getHtmlFieldsetEnd();
@@ -458,7 +469,6 @@ void handleRoot() {
     response_ += fp_.getHtmlTable();
     response_ += fp_.getHtmlTableRowText("Polling intervall:", String(gInverterInterval) + "s");
     response_ += fp_.getHtmlTableRowSpan("Standby:", "no data", "inverterStandby");
-    response_ += fp_.getHtmlTableRowSpan("Input Power:", "no data", "inverterInputPower");
     response_ += fp_.getHtmlTableRowSpan("Active Power:", "no data", "inverterActivePower");
     response_ += fp_.getHtmlTableEnd();
     response_ += fp_.getHtmlFieldsetEnd();

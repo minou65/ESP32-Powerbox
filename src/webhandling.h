@@ -3,10 +3,13 @@
 #ifndef _WEBHANDLING_h
 #define _WEBHANDLING_h
 
-#include "arduino.h"
+#include <arduino.h>
+#include <vector>
+#include <HTTPClient.h>
 
 #include <IotWebConf.h>
 #include <IotWebConfOptionalGroup.h>
+
 #include "common.h"
 
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
@@ -19,7 +22,18 @@ static WiFiClient wifiClient;
 
 extern IotWebConf iotWebConf;
 
-class Relay : public iotwebconf::ParameterGroup {
+class Consumer {
+public:
+    virtual ~Consumer() {}
+    virtual bool isEnabled() const = 0;
+	virtual bool isActive() const { return true; }
+    virtual void setEnabled(bool enabled) = 0;
+    virtual uint32_t getPower() const = 0;
+    virtual String getName() const = 0;
+    virtual void process() {}
+};
+
+class Relay : public iotwebconf::ParameterGroup, public Consumer {
 public:
     Relay(const char* id, uint8_t gpio)
         : ParameterGroup(id, "Relay"),
@@ -38,17 +52,18 @@ public:
         addItem(&_GpioParam);
     }
 
-    bool isEnabled() const { return _Enabled; }
-    void setEnabled(bool enabled) { _Enabled = enabled; }
+    bool isEnabled() const override { return _Enabled; }
+	bool isActive() const override { return getPower() > 0; }
+    void setEnabled(bool enabled) override { _Enabled = enabled; }
     uint8_t getGPIO() const { return static_cast<uint8_t>(atoi(_GpioValue)); }
-    uint32_t getPower() const { return static_cast<uint32_t>(atoi(_PowerValue)); }
+    uint32_t getPower() const override { return static_cast<uint32_t>(atoi(_PowerValue)); }
 
     void setNext(Relay* nextGroup) {
         _nextGroup = nextGroup;
         if (nextGroup) nextGroup->_prevGroup = this;
     }
     Relay* getNext() const { return _nextGroup; }
-	String getName() const { return String(_DesignationValue); }
+	String getName() const override { return String(_DesignationValue); }
 
 
 
@@ -74,7 +89,7 @@ private:
     bool _Enabled;
 };
 
-class Shelly : public iotwebconf::ChainedParameterGroup {
+class Shelly : public iotwebconf::ChainedParameterGroup, public Consumer {
 public:
     Shelly(const char* id)
         : ChainedParameterGroup(id, "Shelly"),
@@ -97,14 +112,40 @@ public:
         addItem(&_TimeParam);
     }
 
-    bool isEnabled() const { return _Enabled; }
-    void setEnabled(bool enabled) { _Enabled = enabled; }
-    uint32_t getPower() const { return static_cast<uint32_t>(atoi(_PowerValue)); }
+    bool isEnabled() const override { return _Enabled; }
+    bool isActive() const override {
+        return ChainedParameterGroup::isActive() && getPower() > 0;
+    }
+    void setEnabled(bool enabled) override { _Enabled = enabled; }
+    uint32_t getPower() const override { return static_cast<uint32_t>(atoi(_PowerValue)); }
     uint32_t getDelay() const { return static_cast<uint32_t>(atoi(_DelayValue)); }
 	String getName() const { return String(_DesignationValue); }
-	String url_OnValue() const { return String(_UrlOnValue); }
-	String url_OffValue() const { return String(_UrlOffValue); }
-	String TimeValue() const { return String(_TimeValue); }
+
+    void process() override {
+        if (!isActive()) return;
+
+        // Get current time as string "HH:MM"
+        time_t now_ = time(nullptr);
+        struct tm* timeinfo_ = localtime(&now_);
+        char timeStr_[6];
+        strftime(timeStr_, sizeof(timeStr_), "%H:%M", timeinfo_);
+        String currentTime_(timeStr_);
+
+        bool shouldEnable_ = currentTime_ >= _TimeValue;
+        if (shouldEnable_) {
+            if (!isEnabled()) {
+                sendHttpRequest(_UrlOnValue);
+                setEnabled(true);
+                _timer.start(getDelay() * 60 * 1000);
+            }
+        }
+        else {
+            if (isEnabled() && _timer.done()) {
+                sendHttpRequest(_UrlOffValue);
+                setEnabled(false);
+            }
+        }
+    }
 
     Neotimer _timer;
 
@@ -132,6 +173,26 @@ private:
     char _TimeValue[STRING_LEN];
 
     bool _Enabled;
+
+    HTTPClient _http;
+
+    void sendHttpRequest(const String& url) {
+        _http.begin(url);
+        int httpCode = _http.GET();
+
+        Serial.print("Invoked web request to "); Serial.println(url);
+
+        if (httpCode > 0) {
+            String payload = _http.getString();
+            Serial.printf("Return code is %i\n", httpCode);
+            //Serial.println(payload);
+        }
+        else {
+            Serial.println("Error on HTTP request");
+        }
+
+        _http.end();
+    }
 };
 
 extern Relay Relay1;
@@ -149,6 +210,8 @@ extern Shelly Shelly7;
 extern Shelly Shelly8;
 extern Shelly Shelly9;
 extern Shelly Shelly10;
+
+extern std::vector<Consumer*> consumers;
 
 #endif
 
