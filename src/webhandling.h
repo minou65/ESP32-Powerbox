@@ -24,13 +24,27 @@ extern IotWebConf iotWebConf;
 
 class Consumer {
 public:
+    enum Status {
+        Disabled,
+        Enabled,
+		DelayedOff
+    };
+
     virtual ~Consumer() {}
     virtual bool isEnabled() const = 0;
 	virtual bool isActive() const { return true; }
-    virtual void setEnabled(bool enabled) = 0;
+    virtual void setEnabled(bool enabled) {};
     virtual uint32_t getPower() const = 0;
     virtual String getName() const = 0;
+    virtual Status getStatus() {
+        if (!isEnabled()) {
+            return Disabled;
+        } else {
+			return Enabled;
+        }
+    }
     virtual void process() {}
+    virtual void setup() {};
 };
 
 class Relay : public iotwebconf::ParameterGroup, public Consumer {
@@ -38,6 +52,7 @@ public:
     Relay(const char* id, uint8_t gpio)
         : ParameterGroup(id, "Relay"),
         _Enabled(false),
+		_timer(60000),
         _prevGroup(nullptr),
         _nextGroup(nullptr) {
         snprintf(_NameId, STRING_LEN, "%s-name", getId());
@@ -52,12 +67,39 @@ public:
         addItem(&_GpioParam);
     }
 
-    bool isEnabled() const override { return _Enabled; }
+    bool isEnabled() const override { 
+		// Serial.print("Relay "); Serial.print(getName()); Serial.print(" enabled: "); Serial.println(_Enabled ? "true" : "false");
+        return _Enabled;
+    }
 	bool isActive() const override { return getPower() > 0; }
-    void setEnabled(bool enabled) override { _Enabled = enabled; }
+    void setEnabled(bool enabled) override {
+        if (_Enabled == enabled) return;
+        _Enabled = enabled;
+        if (!enabled) {
+            _timer.start();
+			//Serial.printf("Relay %s disabled, will turn off after delay\n", getName().c_str());
+        }
+        else {
+            digitalWrite(getGPIO(), HIGH);
+			//Serial.printf("Relay %s enabled\n", getName().c_str());
+        }
+        _Enabled = enabled; 
+    }
     uint8_t getGPIO() const { return static_cast<uint8_t>(atoi(_GpioValue)); }
     uint32_t getPower() const override { return static_cast<uint32_t>(atoi(_PowerValue)); }
-
+    Status getStatus() override {
+        if (_Enabled) {
+            return Enabled;
+        }
+        else {
+            if (!_timer.done() && _timer.started()) {
+                return DelayedOff;
+            }
+            else {
+                return Disabled;
+            }
+		}
+    }
     void setNext(Relay* nextGroup) {
         _nextGroup = nextGroup;
         if (nextGroup) nextGroup->_prevGroup = this;
@@ -66,10 +108,23 @@ public:
 	String getName() const override { return String(_DesignationValue); }
 
 
+    void process() override {
+        if (!isActive()) return;
 
-protected:
-    Relay* _prevGroup;
-    Relay* _nextGroup;
+        if (!_Enabled) {
+            if (_timer.done()) {
+                digitalWrite(getGPIO(), LOW);
+			}
+        }
+	}
+
+    void setup() override {
+        pinMode(getGPIO(), OUTPUT);
+        // Ensure the relay is off at startup
+        digitalWrite(getGPIO(), LOW);
+		setEnabled(false);
+		_timer.stop();
+	}
 
 private:
     iotwebconf::TextParameter _NameParam = iotwebconf::TextParameter("Designation", _NameId, _DesignationValue, STRING_LEN, _NameDefault);
@@ -87,6 +142,10 @@ private:
     char _GpioId[STRING_LEN] = { 0 };
 
     bool _Enabled;
+
+    Relay* _prevGroup;
+    Relay* _nextGroup;
+	Neotimer _timer;
 };
 
 class Shelly : public iotwebconf::ChainedParameterGroup, public Consumer {
@@ -94,7 +153,7 @@ public:
     Shelly(const char* id)
         : ChainedParameterGroup(id, "Shelly"),
         _Enabled(false),
-        _timer(1000) {
+        _timer(60000) {
         snprintf(_NameId, STRING_LEN, "%s-name", getId());
         snprintf(_UrlOnId, STRING_LEN, "%s-urlon", getId());
         snprintf(_UrlOffId, STRING_LEN, "%s-urloff", getId());
@@ -137,17 +196,17 @@ public:
                 sendHttpRequest(_UrlOnValue);
                 setEnabled(true);
                 _timer.start(getDelay() * 60 * 1000);
+				Serial.printf("Shelly %s enabled, will turn off after %u minutes if power condition met\n", getName().c_str(), getDelay());
             }
         }
         else {
             if (isEnabled() && _timer.done()) {
                 sendHttpRequest(_UrlOffValue);
                 setEnabled(false);
+				Serial.printf("Shelly %s disabled due to time condition\n", getName().c_str());
             }
         }
     }
-
-    Neotimer _timer;
 
 private:
     iotwebconf::TextParameter _NameParam = iotwebconf::TextParameter("Designation", _NameId, _DesignationValue, STRING_LEN, _NameDefault);
@@ -175,6 +234,7 @@ private:
     bool _Enabled;
 
     HTTPClient _http;
+    Neotimer _timer;
 
     void sendHttpRequest(const String& url) {
         _http.begin(url);
