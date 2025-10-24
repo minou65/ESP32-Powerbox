@@ -1,9 +1,3 @@
-// 
-// 
-// 
-
-#define DEBUG_WIFI(m) SERIAL_DBG.print(m)
-
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <WiFi.h>
@@ -285,13 +279,18 @@ void handleData() {
     Relay* relay_ = &Relay1;
     uint8_t i_ = 1;
     while (relay_ != nullptr) {
-        if (relay_->isEnabled()) {
-			json_ += "\"relay" + String(i_) + "\":\"On\"";
+        switch(relay_->getStatus()) {
+            case Consumer::Enabled:
+                json_ += "\"relay" + String(i_) + "\":\"On\"";
+                break;
+            case Consumer::DelayedOff:
+                json_ += "\"relay" + String(i_) + "\":\"DelayedOff\"";
+                break;
+            case Consumer::Disabled:
+            default:
+                json_ += "\"relay" + String(i_) + "\":\"Off\"";
+                break;
 		}
-		else {
-			json_ += "\"relay" + String(i_) + "\":\"Off\"";
-		}
-        
         relay_ = (Relay*)relay_->getNext();
         if (relay_ != nullptr) {
 			json_ += ",";
@@ -485,19 +484,22 @@ void handleRoot() {
     response_ += fp_.getHtmlTableEnd();
     response_ += fp_.getHtmlFieldsetEnd();
 
-    response_ += fp_.getHtmlFieldset("Shellys");
-    response_ += fp_.getHtmlTable();
     Shelly* shelly_ = &Shelly1;
-    i_ = 1;
-    while (shelly_ != nullptr) {
-        if (shelly_->isActive()) {
-            response_ += fp_.getHtmlTableRowClass(shelly_->getName() + ":", "led off", "shelly" + String(i_));
+    if (shelly_->isActive()) {
+        response_ += fp_.getHtmlFieldset("Shellys");
+        response_ += fp_.getHtmlTable();
+
+        i_ = 1;
+        while (shelly_ != nullptr) {
+            if (shelly_->isActive()) {
+                response_ += fp_.getHtmlTableRowClass(shelly_->getName() + ":", "led off", "shelly" + String(i_));
+            }
+            shelly_ = (Shelly*)shelly_->getNext();
+            i_++;
         }
-        shelly_ = (Shelly*)shelly_->getNext();
-        i_++;
+        response_ += fp_.getHtmlTableEnd();
+        response_ += fp_.getHtmlFieldsetEnd();
     }
-    response_ += fp_.getHtmlTableEnd();
-    response_ += fp_.getHtmlFieldsetEnd();
 
     response_ += fp_.getHtmlFieldset("Network");
     response_ += fp_.getHtmlTable();
