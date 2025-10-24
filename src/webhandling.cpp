@@ -1,19 +1,19 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <WiFi.h>
-#include <time.h>
-#include <DNSServer.h>
-
-#include <IotWebConf.h>
-#include <IotWebRoot.h>
-#include <IotWebConfUsing.h>
-#include <IotWebConfTParameter.h>
-#include <IotWebConfESP32HTTPUpdateServer.h>
 
 #include "common.h"
 #include "webhandling.h"
 #include "favicon.h"
 #include "inverterhandling.h"
+
+#include <DNSServer.h>
+#include <IotWebConf.h>
+#include <IotWebConfAsyncClass.h>
+#include <IotWebConfAsyncUpdateServer.h>
+#include <IotWebRoot.h>
+#include <IotWebConfUsing.h>
+#include <IotWebConfTParameter.h>
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
 #define CONFIG_VERSION "A5"
@@ -32,12 +32,11 @@
 const char thingName[] = "PowerBox";
 
 // -- Method declarations.
-void handleRoot();
-void handleFavIcon();
-void handleDateTime();
-void handlePower();
-void handleData();
-void handleReboot();
+void onProgress(size_t prg, size_t sz);
+void handleRoot(AsyncWebServerRequest* request);
+void handleDateTime(AsyncWebServerRequest* request);
+void handlePower(AsyncWebServerRequest* request);
+void handleData(AsyncWebServerRequest* request);
 void convertParams();
 void connectWifi(const char* ssid, const char* password);
 iotwebconf::WifiAuthInfo* handleConnectWifiFailure();
@@ -48,9 +47,12 @@ void wifiConnected();
 
 bool gParamsChanged = true;
 bool startAPMode = true;
+bool ShouldReboot = false;  
 
 DNSServer dnsServer;
-WebServer server(80);
+AsyncWebServer server(80);
+AsyncWebServerWrapper asyncWebServerWrapper(&server);
+AsyncUpdateServer AsyncUpdater;
 
 std::vector<Consumer*> consumers = {
     &Relay1, &Relay2, &Relay3, &Relay4,
@@ -69,7 +71,7 @@ protected:
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
 
-IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
+IotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
 
 IotWebConfParameterGroup sysConfGroup = IotWebConfParameterGroup("SysConf", "Inverter");
 
@@ -123,8 +125,6 @@ Shelly Shelly7 = Shelly("Shelly7");
 Shelly Shelly8 = Shelly("Shelly8");
 Shelly Shelly9 = Shelly("Shelly9");
 Shelly Shelly10 = Shelly("Shelly10");
-
-HTTPUpdateServer httpUpdater;
 
 void wifiInit() {
     Serial.begin(115200);
@@ -181,8 +181,8 @@ void wifiInit() {
 
     // -- Define how to handle updateServer calls.
     iotWebConf.setupUpdateServer(
-        [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
-        [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
+        [](const char* updatePath) { AsyncUpdater.setup(&server, updatePath, onProgress); },
+        [](const char* userName, char* password) { AsyncUpdater.updateCredentials(userName, password); });
 
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
@@ -197,14 +197,49 @@ void wifiInit() {
     convertParams();
 
     // -- Set up required URL handlers on the web server.
-    server.on("/", handleRoot);
-    server.on("/favicon.ico", [] { handleFavIcon(); });
-    server.on("/config", [] { iotWebConf.handleConfig(); });
-    server.on("/reboot", HTTP_GET, []() { handleReboot(); });
-    server.on("/DateTime", HTTP_GET, []() { handleDateTime(); });
-    server.on("/power", HTTP_GET, []() { handlePower(); });
-    server.on("/data", HTTP_GET, []() { handleData(); });
-    server.onNotFound([]() { iotWebConf.handleNotFound(); });
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) { handleRoot(request); });
+
+    server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse* response = request->beginResponse_P(200, "image/x-icon", favicon_ico, sizeof(favicon_ico));
+        request->send(response);
+        }
+    );
+
+    server.on("/config", HTTP_ANY, [](AsyncWebServerRequest* request) {
+        Serial.println("Config page requested.");
+        AsyncWebRequestWrapper asyncWebRequestWrapper(request, 4096);
+        Serial.println("Handling config page.");
+        iotWebConf.handleConfig(&asyncWebRequestWrapper);
+        }
+    );
+
+    server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse* response = request->beginResponse(200, "text/html",
+            "<html>"
+            "<head>"
+            "<meta http-equiv=\"refresh\" content=\"15; url=/\">"
+            "<title>Rebooting...</title>"
+            "</head>"
+            "<body>"
+            "Please wait while the device is rebooting...<br>"
+            "You will be redirected to the homepage shortly."
+            "</body>"
+            "</html>");
+        request->client()->setNoDelay(true); // Disable Nagle's algorithm so the client gets the response immediately
+        request->send(response);
+        ShouldReboot = true;
+        }
+    );
+
+    server.on("/DateTime", HTTP_GET, [](AsyncWebServerRequest* request) { handleDateTime(request); });
+    server.on("/power", HTTP_GET, [](AsyncWebServerRequest* request) { handlePower(request); });
+    server.on("/data", HTTP_GET, [](AsyncWebServerRequest* request) { handleData(request); });
+
+    server.onNotFound([](AsyncWebServerRequest* request) {
+        AsyncWebRequestWrapper asyncWebRequestWrapper(request);
+        iotWebConf.handleNotFound(&asyncWebRequestWrapper);
+        }
+    );
 
     Serial.println("Ready.");
 }
@@ -213,17 +248,28 @@ void wifiLoop() {
     // -- doLoop should be called as frequently as possible.
     iotWebConf.doLoop();
     ArduinoOTA.handle();
+
+    if (ShouldReboot || AsyncUpdater.isFinished()) {
+        delay(1000);
+        ESP.restart();
+    }
 }
 
 void wifiConnected(){
     ArduinoOTA.begin();
 }
 
-void handleFavIcon() {
-   server.send_P(200, "image/x-icon", favicon, sizeof(favicon));
+void onProgress(size_t prg, size_t sz) {
+    static size_t lastPrinted = 0;
+    size_t currentPercent = (prg * 100) / sz;
+
+    if (currentPercent % 5 == 0 && currentPercent != lastPrinted) {
+        Serial.printf("Progress: %d%%\n", currentPercent);
+        lastPrinted = currentPercent;
+    }
 }
 
-void handleDateTime() {
+void handleDateTime(AsyncWebServerRequest* request) {
     ESP_LOGD("handleDateTime", "Time requested");
 
     // Get the current time
@@ -234,14 +280,14 @@ void handleDateTime() {
     strftime(timeStr_, sizeof(timeStr_), "%H:%M:%S", timeinfo_);
     strftime(dateStr_, sizeof(dateStr_), "%Y-%m-%d", timeinfo_);
 
-	server.send(200, "text/plain", String(timeStr_));
+	request->send(200, "text/plain", timeStr_);
 }
 
-void handlePower() {
-    server.send(200, "text/plain", String(inverterPowerData.inputPower * 1000, 0));
+void handlePower(AsyncWebServerRequest* request) {
+	request->send(200, "text/plain", String(inverterPowerData.activePower * 1000, 0));
 }
 
-void handleData() {
+void handleData(AsyncWebServerRequest* request) {
     String json_ = "{";
     json_ += "\"RSSI\":\"" + String(WiFi.RSSI()) + "\"";
 
@@ -323,20 +369,7 @@ void handleData() {
     }
     json_ += "}";
     json_ += "}";
-    server.send(200, "text/plain", json_);
-}
-
-void handleReboot() {
-    String message_;
-
-    // redirect to the root page after 15 seconds
-    message_ += "<HEAD><meta http-equiv=\"refresh\" content=\"15;url=/\"></HEAD>\n<BODY><p>\n";
-    message_ += "Rebooting...<br>\n";
-    message_ += "Redirected after 15 seconds...\n";
-    message_ += "</p></BODY>\n";
-
-    server.send(200, "text/html", message_);
-    ESP.restart();
+	request->send(200, "application/json", json_);  
 }
 
 class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {
@@ -426,10 +459,9 @@ protected:
     }
 };
 
-void handleRoot() {
-    // -- Let IotWebConf test and handle captive portal requests.
-    if (iotWebConf.handleCaptivePortal()){
-        // -- Captive portal request were already served.
+void handleRoot(AsyncWebServerRequest* request) {
+    AsyncWebRequestWrapper asyncWebRequestWrapper(request);
+    if (iotWebConf.handleCaptivePortal(&asyncWebRequestWrapper)) {
         return;
     }
 
@@ -520,7 +552,7 @@ void handleRoot() {
     response_ += fp_.getHtmlTableEnd();
     response_ += fp_.getHtmlEnd();
 
-    server.send(200, "text/html", response_);
+	request->send(200, "text/html", response_);
 }
 
 void connectWifi(const char* ssid, const char* password) {
