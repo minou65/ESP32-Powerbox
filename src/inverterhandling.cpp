@@ -220,4 +220,6 @@ void loopInverter() {
     }
 }
 
-
+void stopInverter() {
+    ModbusClient.end();
+}

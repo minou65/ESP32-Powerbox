@@ -87,6 +87,7 @@ extern InverterStatusData inverterStatusData;
 
 void setupInverter();
 void loopInverter();
+void stopInverter();
 void requestInverter(String ip, uint16_t port, uint16_t startaddress, uint16_t number, uint32_t token = millis());
 
 #endif
