@@ -113,11 +113,11 @@ void loop() {
         }
 
         if (printTimer.repeat()) {
+            SERIAL_WEB_SERIALF("Inverter active power:%.2f W\n", inverterActivePower_);
+            SERIAL_WEB_SERIALF("Grid power:%.2f W\n", gridPower_);
+            SERIAL_WEB_SERIALF("Total consumer load:%.2f W\n", totalConsumerLoad_);
+            SERIAL_WEB_SERIALF("Available PV power:%.2f W\n", availablePVPower_);
             SERIAL_WEB_SERIALLN("----");
-            SERIAL_WEB_SERIAL("    Inverter active power: "); SERIAL_WEB_SERIAL(inverterActivePower_); SERIAL_WEB_SERIALLN(" W");
-            SERIAL_WEB_SERIAL("    Grid power: "); SERIAL_WEB_SERIAL(gridPower_); SERIAL_WEB_SERIALLN(" W");
-            SERIAL_WEB_SERIAL("    Total consumer load: "); SERIAL_WEB_SERIAL(totalConsumerLoad_); SERIAL_WEB_SERIALLN(" W");
-            SERIAL_WEB_SERIAL("    Available PV power: "); SERIAL_WEB_SERIAL(availablePVPower_); SERIAL_WEB_SERIALLN(" W");
 
         }
     }
