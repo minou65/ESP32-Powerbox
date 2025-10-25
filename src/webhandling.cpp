@@ -37,6 +37,7 @@ void handleRoot(AsyncWebServerRequest* request);
 void handleDateTime(AsyncWebServerRequest* request);
 void handlePower(AsyncWebServerRequest* request);
 void handleData(AsyncWebServerRequest* request);
+void handlePost(AsyncWebServerRequest* requestrequest);
 void convertParams();
 void connectWifi(const char* ssid, const char* password);
 iotwebconf::WifiAuthInfo* handleConnectWifiFailure();
@@ -65,8 +66,24 @@ protected:
     virtual String getFormEnd() {
         String s_ = OptionalGroupHtmlFormatProvider::getFormEnd();
         s_ += F("</br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>");
-        s_ += F("</br>Return to <a href='/'>home page</a>.");
-		return s_;
+        s_ += F("</br><a href='/'>Home</a>");
+        s_ += F("</br><a href='#' onclick=\"postReset()\">Reset to factory defaults</a>");
+        s_ += F("<script>"
+            "function postReset() {"
+            "fetch('/post', {"
+            "method: 'POST',"
+            "headers: { 'Content-Type': 'application/x-www-form-urlencoded' },"
+            "body: 'reset=true'"
+            "})"
+            ".then(response => {"
+            "if (response.ok) { window.location.href = '/'; }"
+            "})"
+            ".catch(error => {"
+            "console.error('Reset fehlgeschlagen:', error);"
+            "});"
+            "}"
+            "</script>");
+        return s_;
 	}
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
@@ -149,7 +166,7 @@ void wifiInit() {
     Shelly6.setNext(&Shelly7);
     Shelly7.setNext(&Shelly8);
     Shelly8.setNext(&Shelly9);
-    Shelly10.setNext(&Shelly10);
+    Shelly9.setNext(&Shelly10);
 
     sysConfGroup.addItem(&InverterIPAddress);
     sysConfGroup.addItem(&InverterPort);
@@ -206,10 +223,8 @@ void wifiInit() {
     );
 
     server.on("/config", HTTP_ANY, [](AsyncWebServerRequest* request) {
-        Serial.println("Config page requested.");
-        AsyncWebRequestWrapper asyncWebRequestWrapper(request, 4096);
-        Serial.println("Handling config page.");
-        iotWebConf.handleConfig(&asyncWebRequestWrapper);
+        auto* asyncWebRequestWrapper = new AsyncWebRequestWrapper(request, 32000);
+        iotWebConf.handleConfig(asyncWebRequestWrapper);
         }
     );
 
@@ -234,12 +249,15 @@ void wifiInit() {
     server.on("/DateTime", HTTP_GET, [](AsyncWebServerRequest* request) { handleDateTime(request); });
     server.on("/power", HTTP_GET, [](AsyncWebServerRequest* request) { handlePower(request); });
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* request) { handleData(request); });
+    server.on("/post", HTTP_POST, [](AsyncWebServerRequest* request) { handlePost(request); });
 
     server.onNotFound([](AsyncWebServerRequest* request) {
         AsyncWebRequestWrapper asyncWebRequestWrapper(request);
         iotWebConf.handleNotFound(&asyncWebRequestWrapper);
         }
     );
+
+    WebSerial.begin(&server, "/webserial");
 
     Serial.println("Ready.");
 }
@@ -370,6 +388,53 @@ void handleData(AsyncWebServerRequest* request) {
     json_ += "}";
     json_ += "}";
 	request->send(200, "application/json", json_);  
+}
+
+void handlePost(AsyncWebServerRequest* request) {
+    if (request->hasParam("relay1", true)) {
+        String value_ = request->getParam("relay1", true)->value();
+        if (value_ == "on") {
+            Relay1.setEnabled(true);
+        } else {
+            Relay1.setEnabled(false);
+        }
+    }
+    if (request->hasParam("relay2", true)) {
+        String value_ = request->getParam("relay2", true)->value();
+        if (value_ == "on") {
+            Relay2.setEnabled(true);
+        } else {
+            Relay2.setEnabled(false);
+        }
+    }
+    if (request->hasParam("relay3", true)) {
+        String value_ = request->getParam("relay3", true)->value();
+        if (value_ == "on") {
+            Relay3.setEnabled(true);
+        } else {
+            Relay3.setEnabled(false);
+        }
+    }
+    if (request->hasParam("relay4", true)) {
+        String value_ = request->getParam("relay4", true)->value();
+        if (value_ == "on") {
+            Relay4.setEnabled(true);
+        } else {
+            Relay4.setEnabled(false);
+        }
+    }
+
+    if (request->hasParam("reset", true)) {
+        String value_ = request->getParam("reset", true)->value();
+        if (value_ == "true") {
+            Serial.println("Resetting energy counters...");
+            for (auto consumer_ : consumers) {
+                consumer_->applyDefaultValue();
+			}
+        }
+	}
+
+    request->redirect("/");
 }
 
 class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {

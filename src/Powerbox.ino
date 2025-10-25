@@ -113,11 +113,11 @@ void loop() {
         }
 
         if (printTimer.repeat()) {
-            Serial.println("----");
-            Serial.print("    Inverter active power: "); Serial.print(inverterActivePower_); Serial.println(" W");
-            Serial.print("    Grid power: "); Serial.print(gridPower_); Serial.println(" W");
-            Serial.print("    Total consumer load: "); Serial.print(totalConsumerLoad_); Serial.println(" W");
-            Serial.print("    Available PV power: "); Serial.print(availablePVPower_); Serial.println(" W");
+            SERIAL_WEB_SERIALLN("----");
+            SERIAL_WEB_SERIAL("    Inverter active power: "); SERIAL_WEB_SERIAL(inverterActivePower_); SERIAL_WEB_SERIALLN(" W");
+            SERIAL_WEB_SERIAL("    Grid power: "); SERIAL_WEB_SERIAL(gridPower_); SERIAL_WEB_SERIALLN(" W");
+            SERIAL_WEB_SERIAL("    Total consumer load: "); SERIAL_WEB_SERIAL(totalConsumerLoad_); SERIAL_WEB_SERIALLN(" W");
+            SERIAL_WEB_SERIAL("    Available PV power: "); SERIAL_WEB_SERIAL(availablePVPower_); SERIAL_WEB_SERIALLN(" W");
 
         }
     }
@@ -125,7 +125,7 @@ void loop() {
         for (Consumer* c_ : consumers) {
             if (c_->isEnabled() && c_->isActive()) {
                 c_->setEnabled(false);
-                Serial.printf("Disabled consumer: %s\n", c_->getName().c_str());
+                SERIAL_WEB_SERIALF("Disabled consumer: %s\n", c_->getName().c_str());
             }
         };
 	}
@@ -133,6 +133,12 @@ void loop() {
 	if (gParamsChanged) {
         for (Consumer* c_ : consumers) {
             c_->setup();
+
+            if (!c_->isActive()){
+                c_->setEnabled(false);
+				c_->applyDefaultValue();
+			}
+
         }
 	}
 

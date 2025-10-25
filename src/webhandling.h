@@ -9,8 +9,29 @@
 
 #include <IotWebConf.h>
 #include <IotWebConfOptionalGroup.h>
+#include <WebSerial.h>
 
 #include "common.h"
+
+
+#define SERIAL_WEB_SERIAL(...) \
+    do { \
+        Serial.print(__VA_ARGS__); \
+        WebSerial.print(__VA_ARGS__); \
+    } while(0)
+
+#define SERIAL_WEB_SERIALLN(...) \
+    do { \
+        Serial.println(__VA_ARGS__); \
+        WebSerial.println(__VA_ARGS__); \
+    } while(0)
+#define SERIAL_WEB_SERIALF(fmt, ...) \
+    do { \
+        Serial.printf(fmt, __VA_ARGS__); \
+        char _buf[128]; \
+        snprintf(_buf, sizeof(_buf), fmt, __VA_ARGS__); \
+        WebSerial.print(_buf); \
+    } while(0)
 
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
 const char wifiInitialApPassword[] = "123456789";
@@ -45,6 +66,7 @@ public:
     }
     virtual void process() {}
     virtual void setup() {};
+    virtual void applyDefaultValue() {};
 };
 
 class Relay : public iotwebconf::ParameterGroup, public Consumer {
@@ -124,6 +146,12 @@ public:
         digitalWrite(getGPIO(), LOW);
 		setEnabled(false);
 		_timer.stop();
+	}
+
+    void applyDefaultValue() override {
+        _NameParam.applyDefaultValue();
+        _PowerParam.applyDefaultValue();
+        _GpioParam.applyDefaultValue();
 	}
 
 private:
@@ -207,6 +235,15 @@ public:
             }
         }
     }
+
+    void applyDefaultValue() override {
+        _NameParam.applyDefaultValue();
+        _UrlOnParam.applyDefaultValue();
+        _UrlOffParam.applyDefaultValue();
+        _PowerParam.applyDefaultValue();
+        _DelayParam.applyDefaultValue();
+        _TimeParam.applyDefaultValue();
+	}
 
 private:
     iotwebconf::TextParameter _NameParam = iotwebconf::TextParameter("Designation", _NameId, _DesignationValue, STRING_LEN, _NameDefault);
