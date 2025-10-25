@@ -237,19 +237,17 @@ public:
         String currentTime_(timeStr_);
 
         bool shouldEnable_ = currentTime_ >= _TimeValue;
-        if (shouldEnable_) {
-            if (!isEnabled()) {
-                sendHttpRequest(_UrlOnValue);
-                setEnabled(true);
-                _timer.start(getDelay() * 60 * 1000);
-				Serial.printf("Shelly %s enabled, will turn off after %u minutes if power condition met\n", getName().c_str(), getDelay());
-            }
+
+        if (_Enabled && shouldEnable_) {
+            sendHttpRequest(_UrlOnValue);
+            _timer.stop();
+            Serial.printf("Shelly %s enabled, will turn off after %u minutes if power condition met\n", getName().c_str(), getDelay());
         }
-        else {
-            if (isEnabled() && _timer.done()) {
+        else if (!_Enabled) {
+            if (_timer.done() && _timer.started()) {
                 sendHttpRequest(_UrlOffValue);
-                setEnabled(false);
-				Serial.printf("Shelly %s disabled due to time condition\n", getName().c_str());
+                _timer.stop();
+                Serial.printf("Shelly %s disabled due to time condition\n", getName().c_str());
             }
         }
     }
