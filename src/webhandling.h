@@ -42,6 +42,7 @@ extern void wifiLoop();
 static WiFiClient wifiClient;
 
 extern IotWebConf iotWebConf;
+extern bool ShouldReboot;
 
 class Consumer {
 public:

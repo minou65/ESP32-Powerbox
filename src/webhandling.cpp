@@ -356,14 +356,12 @@ void wifiInit() {
 }
 
 void wifiLoop() {
-    // -- doLoop should be called as frequently as possible.
     iotWebConf.doLoop();
     ArduinoOTA.handle();
 
-    if (ShouldReboot || AsyncUpdater.isFinished()) {
-        delay(1000);
-        ESP.restart();
-    }
+    if (!ShouldReboot) {
+		ShouldReboot = AsyncUpdater.isFinished();
+	}
 }
 
 void wifiConnected(){
@@ -671,6 +669,7 @@ void convertParams() {
     strcpy(gInverterIPAddress, InverterIPAddress.value());
     gInverterPort = InverterPort.value();
     gInverterInterval = InverterActivePowerInterval.value();
+    ArduinoOTA.setHostname(iotWebConf.getThingName());
 }
 
 void configSaved() {

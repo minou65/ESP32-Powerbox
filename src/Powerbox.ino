@@ -142,5 +142,12 @@ void loop() {
         }
 	}
 
+    if (ShouldReboot) {
+        SERIAL_WEB_SERIALLN("Rebooting...");
+		stopInverter();
+        delay(1000);
+        ESP.restart();
+	}
+
 	gParamsChanged = false;
 }
