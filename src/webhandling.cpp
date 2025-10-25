@@ -38,6 +38,9 @@ void handleDateTime(AsyncWebServerRequest* request);
 void handlePower(AsyncWebServerRequest* request);
 void handleData(AsyncWebServerRequest* request);
 void handlePost(AsyncWebServerRequest* requestrequest);
+void handleAPPasswordMissingPage(iotwebconf::WebRequestWrapper* webRequestWrapper);
+void handleSSIDNotConfiguredPage(iotwebconf::WebRequestWrapper* webRequestWrapper);
+void handleConfigSavedPage(iotwebconf::WebRequestWrapper* webRequestWrapper);
 void convertParams();
 void connectWifi(const char* ssid, const char* password);
 iotwebconf::WifiAuthInfo* handleConnectWifiFailure();
@@ -87,6 +90,93 @@ protected:
 	}
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
+
+class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {
+public:
+    String getHtmlTableRowClass(String name, String htmlclass, String id) {
+        String s_ = F("<tr><td align=\"left\">{n}</td><td align=\"left\"><span id=\"{id}\" class=\"{c}\"></span></td></tr>\n");
+        s_.replace("{n}", name);
+        s_.replace("{c}", htmlclass);
+        s_.replace("{id}", id);
+        return s_;
+    }
+
+protected:
+    virtual String getStyleInner() {
+        String s_ = HtmlRootFormatProvider::getStyleInner();
+        s_ += F(".led {display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }\n");
+        s_ += F(".led.off {background-color: grey;}\n");
+        s_ += F(".led.on {background-color: green;}\n");
+        s_ += F(".led.delayedoff {background-color: orange;}\n");
+        return s_;
+    }
+
+    virtual String getScriptInner() {
+        String s_ = HtmlRootFormatProvider::getScriptInner();
+
+        s_.replace("{millisecond}", "5000");
+        s_ += F("requestDateTime();\n");
+        s_ += F("setInterval(requestDateTime, 1000);\n");
+
+        s_ += F("function requestDateTime() { \n");
+        s_ += F("   var xhttp = new XMLHttpRequest();\n");
+        s_ += F("   xhttp.onreadystatechange = function() {\n");
+        s_ += F("       if (this.readyState == 4 && this.status == 200) {\n");
+        s_ += F("           document.getElementById('DateTimeValue').innerHTML = this.responseText;\n");
+        s_ += F("       }\n");
+        s_ += F("   };\n");
+        s_ += F("   xhttp.open('GET', 'DateTime', true);\n");
+        s_ += F("   xhttp.send(); \n");
+        s_ += F("}\n");
+
+        s_ += F("function updateLED(element, status) {\n");
+        s_ += F("   if (element) {\n");
+        s_ += F("       element.classList.remove('on', 'off', 'delayedoff');\n");
+        s_ += F("       element.classList.add(status);\n");
+        s_ += F("   }\n");
+        s_ += F("}\n");
+
+        s_ += F("function updateData(jsonData) {\n");
+        s_ += F("   document.getElementById('RSSIValue').innerHTML = jsonData.RSSI + \"dBm\" \n");
+
+        s_ += F("   document.getElementById('gridVoltageA').innerHTML = jsonData.Grid.VoltageA + \"V\" \n");
+        s_ += F("   document.getElementById('gridVoltageB').innerHTML = jsonData.Grid.VoltageB + \"V\" \n");
+        s_ += F("   document.getElementById('gridVoltageC').innerHTML = jsonData.Grid.VoltageC + \"V\" \n");
+        s_ += F("   document.getElementById('gridCurrentA').innerHTML = jsonData.Grid.CurrentA + \"A\" \n");
+        s_ += F("   document.getElementById('gridCurrentB').innerHTML = jsonData.Grid.CurrentB + \"A\" \n");
+        s_ += F("   document.getElementById('gridCurrentC').innerHTML = jsonData.Grid.CurrentC + \"A\" \n");
+        s_ += F("   document.getElementById('gridActivePower').innerHTML = jsonData.Grid.ActivePower + \"W\" \n");
+
+        s_ += F("   document.getElementById('inverterStandby').innerHTML = jsonData.Inverter.Standby \n");
+        s_ += F("   document.getElementById('inverterActivePower').innerHTML = jsonData.Inverter.ActivePower + \"W\" \n");
+
+        s_ += F("   updateLED(document.getElementById('relay1'), jsonData.Relays.relay1.toLowerCase());\n");
+        s_ += F("   updateLED(document.getElementById('relay2'), jsonData.Relays.relay2.toLowerCase());\n");
+        s_ += F("   updateLED(document.getElementById('relay3'), jsonData.Relays.relay3.toLowerCase());\n");
+        s_ += F("   updateLED(document.getElementById('relay4'), jsonData.Relays.relay4.toLowerCase());\n");
+
+        // Set grid power direction
+        s_ += F("   if (parseFloat(jsonData.Grid.ActivePower) > 0) {\n");
+        s_ += F("       document.getElementById('gridPowerDirection').innerHTML = \"to Grid\";\n");
+        s_ += F("   } else {\n");
+        s_ += F("       document.getElementById('gridPowerDirection').innerHTML = \"from Grid\";\n");
+        s_ += F("   }\n");
+
+        Shelly* shelly_ = &Shelly1;
+        uint8_t i_ = 1;
+        while (shelly_ != nullptr) {
+            if (shelly_->isActive()) {
+                s_ += "   updateLED(document.getElementById('shelly" + String(i_) + "'), jsonData.Shellys.shelly" + String(i_) + ".toLowerCase());\n";
+            }
+            shelly_ = (Shelly*)shelly_->getNext();
+            i_++;
+        }
+
+        s_ += F("}\n");
+
+        return s_;
+    }
+};
 
 IotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
 
@@ -205,6 +295,9 @@ void wifiInit() {
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
     iotWebConf.setWifiConnectionHandler(&connectWifi);
     iotWebConf.setWifiConnectionFailedHandler(&handleConnectWifiFailure);
+    iotWebConf.setConfigSavedPage(&handleConfigSavedPage);
+    iotWebConf.setConfigAPPasswordMissingPage(&handleAPPasswordMissingPage);
+    iotWebConf.setConfigSSIDNotConfiguredPage(&handleSSIDNotConfiguredPage);
 
     iotWebConf.getApTimeoutParameter()->visible = true;
 
@@ -437,92 +530,35 @@ void handlePost(AsyncWebServerRequest* request) {
     request->redirect("/");
 }
 
-class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {
-public:
-    String getHtmlTableRowClass(String name, String htmlclass, String id) {
-        String s_ = F("<tr><td align=\"left\">{n}</td><td align=\"left\"><span id=\"{id}\" class=\"{c}\"></span></td></tr>\n");
-        s_.replace("{n}", name);
-        s_.replace("{c}", htmlclass);
-        s_.replace("{id}", id);
-        return s_;
-    }
+void handleAPPasswordMissingPage(iotwebconf::WebRequestWrapper* webRequestWrapper) {
+    String content_;
+    MyHtmlRootFormatProvider fp_;
 
-protected:
-    virtual String getStyleInner() {
-        String s_ = HtmlRootFormatProvider::getStyleInner();
-        s_ += F(".led {display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }\n");
-        s_ += F(".led.off {background-color: grey;}\n");
-        s_ += F(".led.on {background-color: green;}\n");
-        s_ += F(".led.delayedoff {background-color: orange;}\n");
-        return s_;
-    }
+    content_ += fp_.getHtmlHead(iotWebConf.getThingName());
+    content_ += fp_.getHtmlStyle();
+    content_ += fp_.getHtmlHeadEnd();
+    content_ += "<body>";
+    content_ += "You should change the default AP password to continue.";
+    content_ += fp_.addNewLine(2);
+    content_ += "Return to <a href='config'>configuration page</a>.";
+    content_ += fp_.addNewLine(1);
+    content_ += "Return to <a href='/'>home page</a>.";
+    content_ += "</body>";
+    content_ += fp_.getHtmlEnd();
 
-    virtual String getScriptInner() {
-        String s_ = HtmlRootFormatProvider::getScriptInner();
+    webRequestWrapper->sendHeader("Content-Length", String(content_.length()));
+    webRequestWrapper->send(200, "text/html", content_);
+}
 
-        s_.replace("{millisecond}", "5000");
-        s_ += F("requestDateTime();\n");
-        s_ += F("setInterval(requestDateTime, 1000);\n");
+void handleSSIDNotConfiguredPage(iotwebconf::WebRequestWrapper* webRequestWrapper) {
+    webRequestWrapper->sendHeader("Location", "/", true);
+    webRequestWrapper->send(302, "text/plain", "SSID not configured");
+}
 
-        s_ += F("function requestDateTime() { \n");
-        s_ += F("   var xhttp = new XMLHttpRequest();\n");
-        s_ += F("   xhttp.onreadystatechange = function() {\n");
-        s_ += F("       if (this.readyState == 4 && this.status == 200) {\n");
-        s_ += F("           document.getElementById('DateTimeValue').innerHTML = this.responseText;\n");
-        s_ += F("       }\n");
-        s_ += F("   };\n");
-        s_ += F("   xhttp.open('GET', 'DateTime', true);\n");
-        s_ += F("   xhttp.send(); \n");
-        s_ += F("}\n");
-
-        s_ += F("function updateLED(element, status) {\n");
-        s_ += F("   if (element) {\n");
-        s_ += F("       element.classList.remove('on', 'off', 'delayedoff');\n");
-        s_ += F("       element.classList.add(status);\n");
-        s_ += F("   }\n");
-        s_ += F("}\n");
-
-        s_ += F("function updateData(jsonData) {\n");
-        s_ += F("   document.getElementById('RSSIValue').innerHTML = jsonData.RSSI + \"dBm\" \n");
-
-		s_ += F("   document.getElementById('gridVoltageA').innerHTML = jsonData.Grid.VoltageA + \"V\" \n");
-		s_ += F("   document.getElementById('gridVoltageB').innerHTML = jsonData.Grid.VoltageB + \"V\" \n");
-		s_ += F("   document.getElementById('gridVoltageC').innerHTML = jsonData.Grid.VoltageC + \"V\" \n");
-		s_ += F("   document.getElementById('gridCurrentA').innerHTML = jsonData.Grid.CurrentA + \"A\" \n");
-		s_ += F("   document.getElementById('gridCurrentB').innerHTML = jsonData.Grid.CurrentB + \"A\" \n");
-		s_ += F("   document.getElementById('gridCurrentC').innerHTML = jsonData.Grid.CurrentC + \"A\" \n");
-		s_ += F("   document.getElementById('gridActivePower').innerHTML = jsonData.Grid.ActivePower + \"W\" \n");
-
-		s_ += F("   document.getElementById('inverterStandby').innerHTML = jsonData.Inverter.Standby \n");
-		s_ += F("   document.getElementById('inverterActivePower').innerHTML = jsonData.Inverter.ActivePower + \"W\" \n");
-
-        s_ += F("   updateLED(document.getElementById('relay1'), jsonData.Relays.relay1.toLowerCase());\n");
-        s_ += F("   updateLED(document.getElementById('relay2'), jsonData.Relays.relay2.toLowerCase());\n");
-        s_ += F("   updateLED(document.getElementById('relay3'), jsonData.Relays.relay3.toLowerCase());\n");
-        s_ += F("   updateLED(document.getElementById('relay4'), jsonData.Relays.relay4.toLowerCase());\n");
-
-        // Set grid power direction
-        s_ += F("   if (parseFloat(jsonData.Grid.ActivePower) > 0) {\n");
-        s_ += F("       document.getElementById('gridPowerDirection').innerHTML = \"to Grid\";\n");
-        s_ += F("   } else {\n");
-        s_ += F("       document.getElementById('gridPowerDirection').innerHTML = \"from Grid\";\n");
-        s_ += F("   }\n");
-
-        Shelly* shelly_ = &Shelly1;
-        uint8_t i_ = 1;
-        while (shelly_ != nullptr) {
-            if (shelly_->isActive()) {
-                s_ += "   updateLED(document.getElementById('shelly" + String(i_) + "'), jsonData.Shellys.shelly" + String(i_) + ".toLowerCase());\n";
-            }
-            shelly_ = (Shelly*)shelly_->getNext();
-            i_++;
-        }
-
-        s_ += F("}\n");
-
-        return s_;
-    }
-};
+void handleConfigSavedPage(iotwebconf::WebRequestWrapper* webRequestWrapper) {
+    webRequestWrapper->sendHeader("Location", "/", true);
+    webRequestWrapper->send(302, "text/plain", "Config saved");
+}
 
 void handleRoot(AsyncWebServerRequest* request) {
     AsyncWebRequestWrapper asyncWebRequestWrapper(request);
