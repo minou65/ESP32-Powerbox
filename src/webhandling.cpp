@@ -642,8 +642,9 @@ void handleRoot(AsyncWebServerRequest* request) {
     response_ += fp_.addNewLine(2);
 
     response_ += fp_.getHtmlTable();
-    //response_ += fp_.getHtmlTableRowSpan("Time:", "not valid", "DateTimeValue");
-    response_ += fp_.getHtmlTableRowText("Go to <a href = 'config'>configure page</a> to change configuration.");
+
+    response_ += fp_.getHtmlTableRowText("Open <a href='/config'>configuration page</a>.");
+    response_ += fp_.getHtmlTableRowText("Open <a href='/webserial' target='_blank'>WebSerial Console</a> for live logs.");
     response_ += fp_.getHtmlTableRowText(fp_.getHtmlVersion(Version));
     response_ += fp_.getHtmlTableEnd();
 
