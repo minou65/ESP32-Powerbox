@@ -460,14 +460,17 @@ void handleData(AsyncWebServerRequest* request) {
     i_ = 1;
     while (shelly_ != nullptr) {
         if (shelly_->isActive()) {
-            if(shelly_->isEnabled() && (inverterPowerData.inputPower * 1000 > shelly_->getPower())) {
-				json_ += "\"shelly" + String(i_) + "\":\"On\"";
-			}
-			else if (shelly_->isEnabled() && (inverterPowerData.inputPower * 1000 <= shelly_->getPower())) {
-				json_ += "\"shelly" + String(i_) + "\":\"DelayedOff\"";
-			}
-			else {
-				json_ += "\"shelly" + String(i_) + "\":\"Off\"";
+            switch (shelly_->getStatus()) {
+                case Consumer::Enabled:
+                    json_ += "\"shelly" + String(i_) + "\":\"On\"";
+                    break;
+                case Consumer::DelayedOff:
+                    json_ += "\"shelly" + String(i_) + "\":\"DelayedOff\"";
+                    break;
+                case Consumer::Disabled:
+                default:
+                    json_ += "\"shelly" + String(i_) + "\":\"Off\"";
+                    break;
 			}
         }
         shelly_ = (Shelly*)shelly_->getNext();
@@ -518,7 +521,7 @@ void handlePost(AsyncWebServerRequest* request) {
     if (request->hasParam("reset", true)) {
         String value_ = request->getParam("reset", true)->value();
         if (value_ == "true") {
-            Serial.println("Resetting energy counters...");
+            Serial.println("apply default values...");
             for (auto consumer_ : consumers) {
                 consumer_->applyDefaultValue();
 			}
