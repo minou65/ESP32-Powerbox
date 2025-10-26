@@ -52,7 +52,7 @@ void setup() {
 	printTimer.start();
 
     for (Consumer* c_ : consumers) {
-        c_->setup();
+        c_->begin();
     }
 
 }
@@ -99,7 +99,7 @@ void loop() {
 			float partialPower_ = power_ * c_->getPartialLoadThreshold();
             if (c_->isActive() && (
                 power_ <= remainingPVPower_ ||
-                (c_->isParitialLoadAllowed() && partialPower_ <= remainingPVPower_)
+                (c_->isPartialLoadAllowed() && partialPower_ <= remainingPVPower_)
                 )) {
                 c_->setEnabled(true);
                 remainingPVPower_ -= power_;
@@ -136,7 +136,8 @@ void loop() {
 
 	if (gParamsChanged) {
         for (Consumer* c_ : consumers) {
-            c_->setup();
+            c_->end();
+            c_->begin();
 
             if (!c_->isActive()){
                 c_->setEnabled(false);
@@ -148,6 +149,9 @@ void loop() {
 
     if (ShouldReboot) {
         SERIAL_WEB_SERIALLN("Rebooting...");
+        for (Consumer* c_ : consumers) {
+            c_->end();
+        }
 		stopInverter();
         delay(1000);
         ESP.restart();
