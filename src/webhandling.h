@@ -55,7 +55,9 @@ public:
     virtual ~Consumer() {}
     virtual bool isEnabled() const = 0;
 	virtual bool isActive() const { return true; }
+	virtual bool isParitialLoadAllowed() const { return _partialLoadAllowed; }
     virtual void setEnabled(bool enabled) {};
+    virtual void setPartialLoadAllowed(bool allowed) { _partialLoadAllowed = allowed; };
     virtual uint32_t getPower() const = 0;
     virtual String getName() const = 0;
     virtual Status getStatus() {
@@ -65,9 +67,14 @@ public:
 			return Enabled;
         }
     }
+	virtual float getPartialLoadThreshold() const { return _partialLoadThreshold; }
     virtual void process() {}
     virtual void setup() {};
     virtual void applyDefaultValue() {};
+
+private:
+	bool _partialLoadAllowed = false; // Default: no partial load
+	float _partialLoadThreshold = 0.5;
 };
 
 class Relay : public iotwebconf::ParameterGroup, public Consumer {
@@ -150,6 +157,14 @@ public:
                 Serial.printf("Relay %s turned off after delay\n", getName().c_str());
 			}
         }
+
+        if (currentTime_ > "13:00") {
+			setPartialLoadAllowed(true);
+		}
+        else if (currentTime_ > "18:00") {
+            setPartialLoadAllowed(false);
+        }
+
     }
 
     void setup() override {

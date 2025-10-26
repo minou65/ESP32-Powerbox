@@ -68,8 +68,10 @@ void loop() {
 
 		float totalEnabledPower_ = 0;
         for(Consumer* c_ : consumers) {
+            float power_ = c_->getPower();
+            float partialPower_ = power_ * c_->getPartialLoadThreshold();
             if (c_->isEnabled() && c_->isActive()) {
-                totalEnabledPower_ += c_->getPower();
+                totalEnabledPower_ += power_;
             }
 		}
 
@@ -90,18 +92,20 @@ void loop() {
             c_->setEnabled(false);
         }
 
-        float remainingPVPower_ = gridPower_ - PV_POWER_RESERVE_ON;
-        if (remainingPVPower_ < 0) remainingPVPower_ = 0;
-
-		float totalConsumerLoad_ = 0;
+        float remainingPVPower_ = availablePVPower_;
+        float totalConsumerLoad_ = 0;
         for (Consumer* c_ : consumers) {
-            if (c_->isActive() && c_->getPower() <= remainingPVPower_) {
+            float power_ = c_->getPower();
+			float partialPower_ = power_ * c_->getPartialLoadThreshold();
+            if (c_->isActive() && (
+                power_ <= remainingPVPower_ ||
+                (c_->isParitialLoadAllowed() && partialPower_ <= remainingPVPower_)
+                )) {
                 c_->setEnabled(true);
-                remainingPVPower_ -= c_->getPower();
-				totalConsumerLoad_ += c_->getPower();
+                remainingPVPower_ -= power_;
+                totalConsumerLoad_ += power_;
             }
         }
-
 
         // For each consumer, call process
         for (Consumer* c_ : consumers) {
