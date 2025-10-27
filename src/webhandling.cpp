@@ -180,41 +180,8 @@ protected:
 
 IotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
 
-IotWebConfParameterGroup sysConfGroup = IotWebConfParameterGroup("SysConf", "Inverter");
-
-iotwebconf::TextTParameter<15> InverterIPAddress =
-    iotwebconf::Builder<iotwebconf::TextTParameter<sizeof(gInverterIPAddress)>>("InverterIPAddress").
-    label("IPAddress").
-    defaultValue("192.168.1.105").
-    build();
-
-iotwebconf::UIntTParameter<uint16_t> InverterPort =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("InverterPort").
-    label("Port").
-    defaultValue(502).
-    min(1u).
-    step(1).
-    placeholder("1..65535").
-    build();
-
-iotwebconf::UIntTParameter<uint16_t> InverterActivePowerInterval =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("InverterActivePowerInterval").
-    label("Interval (seconds)").
-    defaultValue(10).
-    min(10).
-    max(255).
-    step(1).
-    placeholder("10..255").
-    build();
-
-char vUseNTPServer[STRING_LEN];
-char vNTPServer[STRING_LEN];
-char vTimeZone[STRING_LEN];
-iotwebconf::ParameterGroup TimeSourceGroup = iotwebconf::ParameterGroup("TimeSourceGroup", "Time Source");
-iotwebconf::CheckboxParameter cUseNTPServer = iotwebconf::CheckboxParameter("Use NTP server", "UseNTPServerParam", vUseNTPServer, STRING_LEN, true);
-iotwebconf::TextParameter cNTPServerAddress = iotwebconf::TextParameter("NTP server (FQDN or IP address)", "NTPServerParam", vNTPServer, STRING_LEN, "pool.ntp.org");
-iotwebconf::TextParameter cgmtOffset_sec = iotwebconf::TextParameter("POSIX timezones string", "TimeOffsetParam", vTimeZone, STRING_LEN, "CET-1CEST,M3.5.0,M10.5.0/3");
-
+InverterConfig inverterConfig = InverterConfig();
+NtpConfig ntpConfig = NtpConfig();
 
 Relay Relay1 = Relay("Relay1", GPIO_NUM_22);
 Relay Relay2 = Relay("Relay2", GPIO_NUM_21);
@@ -258,17 +225,8 @@ void wifiInit() {
     Shelly8.setNext(&Shelly9);
     Shelly9.setNext(&Shelly10);
 
-    sysConfGroup.addItem(&InverterIPAddress);
-    sysConfGroup.addItem(&InverterPort);
-    sysConfGroup.addItem(&InverterActivePowerInterval);
-
-    iotWebConf.addParameterGroup(&sysConfGroup);
-
-    TimeSourceGroup.addItem(&cUseNTPServer);
-    TimeSourceGroup.addItem(&cNTPServerAddress);
-    TimeSourceGroup.addItem(&cgmtOffset_sec);
-
-    iotWebConf.addParameterGroup(&TimeSourceGroup);
+    iotWebConf.addParameterGroup(&inverterConfig);
+	iotWebConf.addParameterGroup(&ntpConfig);
 
     iotWebConf.addParameterGroup(&Relay1);
     iotWebConf.addParameterGroup(&Relay2);
@@ -393,40 +351,44 @@ void handleDateTime(AsyncWebServerRequest* request) {
 }
 
 void handlePower(AsyncWebServerRequest* request) {
-	request->send(200, "text/plain", String(inverterPowerData.activePower * 1000, 0));
+	request->send(200, "text/plain", String(inverter.getPowerData().activePower * 1000, 0));
 }
 
 void handleData(AsyncWebServerRequest* request) {
+    PowerData powerData_ = inverter.getPowerData();
+    MeterData meterData_ = inverter.getMeterData();
+	StatusData statusData_ = inverter.getStatusData();   
+
     String json_ = "{";
     json_ += "\"RSSI\":\"" + String(WiFi.RSSI()) + "\"";
 
     // Grid node
     json_ += ",\"Grid\":{";
-    json_ += "\"VoltageA\":\"" + String(meterData.gridVoltageA, 1) + "\"";
-    json_ += ",\"VoltageB\":\"" + String(meterData.gridVoltageB, 1) + "\"";
-    json_ += ",\"VoltageC\":\"" + String(meterData.gridVoltageC, 1) + "\"";
-    json_ += ",\"CurrentA\":\"" + String(meterData.gridCurrentA, 3) + "\"";
-    json_ += ",\"CurrentB\":\"" + String(meterData.gridCurrentB, 3) + "\"";
-    json_ += ",\"CurrentC\":\"" + String(meterData.gridCurrentC, 3) + "\"";
-    json_ += ",\"Frequency\":\"" + String(meterData.gridFrequency, 2) + "\"";
-    json_ += ",\"PowerFactor\":\"" + String(meterData.powerFactor, 3) + "\"";
-	json_ += ",\"ActivePower\":\"" + String(meterData.activePower, 0) + "\"";
-	json_ += ",\"ReactivePower\":\"" + String(meterData.reactivePower, 0) + "\"";
+    json_ += "\"VoltageA\":\"" + String(meterData_.gridVoltageA, 1) + "\"";
+    json_ += ",\"VoltageB\":\"" + String(meterData_.gridVoltageB, 1) + "\"";
+    json_ += ",\"VoltageC\":\"" + String(meterData_.gridVoltageC, 1) + "\"";
+    json_ += ",\"CurrentA\":\"" + String(meterData_.gridCurrentA, 3) + "\"";
+    json_ += ",\"CurrentB\":\"" + String(meterData_.gridCurrentB, 3) + "\"";
+    json_ += ",\"CurrentC\":\"" + String(meterData_.gridCurrentC, 3) + "\"";
+    json_ += ",\"Frequency\":\"" + String(meterData_.gridFrequency, 2) + "\"";
+    json_ += ",\"PowerFactor\":\"" + String(meterData_.powerFactor, 3) + "\"";
+	json_ += ",\"ActivePower\":\"" + String(meterData_.activePower, 0) + "\"";
+	json_ += ",\"ReactivePower\":\"" + String(meterData_.reactivePower, 0) + "\"";
     json_ += "}";
 
     // Inverter node
     json_ += ",\"Inverter\":{";
-    json_ += "\"InputPower\":\"" + String(inverterPowerData.inputPower * 1000, 0) + "\"";
-    json_ += ",\"ActivePower\":\"" + String(inverterPowerData.activePower * 1000, 0) + "\"";
-    json_ += ",\"ReactivePower\":\"" + String(inverterPowerData.reactivePower * 1000, 0) + "\"";
-    json_ += ",\"GridVoltageAB\":\"" + String(inverterPowerData.gridVoltageAB, 1) + "\"";
-    json_ += ",\"GridVoltageBC\":\"" + String(inverterPowerData.gridVoltageBC, 1) + "\"";
-    json_ += ",\"GridVoltageCA\":\"" + String(inverterPowerData.gridVoltageCA, 1) + "\"";
-    json_ += ",\"GridCurrentA\":\"" + String(inverterPowerData.gridCurrentA, 3) + "\"";
-    json_ += ",\"GridCurrentB\":\"" + String(inverterPowerData.gridCurrentB, 3) + "\"";
-    json_ += ",\"GridCurrentC\":\"" + String(inverterPowerData.gridCurrentC, 3) + "\"";
-    json_ += ",\"PowerFactor\":\"" + String(inverterPowerData.powerFactor, 3) + "\"";
-    json_ += ",\"Standby\":\"" + String(inverterStatusData.isStandby() ? "Yes" : "No") + "\"";
+    json_ += "\"InputPower\":\"" + String(powerData_.inputPower * 1000, 0) + "\"";
+    json_ += ",\"ActivePower\":\"" + String(powerData_.activePower * 1000, 0) + "\"";
+    json_ += ",\"ReactivePower\":\"" + String(powerData_.reactivePower * 1000, 0) + "\"";
+    json_ += ",\"GridVoltageAB\":\"" + String(powerData_.gridVoltageAB, 1) + "\"";
+    json_ += ",\"GridVoltageBC\":\"" + String(powerData_.gridVoltageBC, 1) + "\"";
+    json_ += ",\"GridVoltageCA\":\"" + String(powerData_.gridVoltageCA, 1) + "\"";
+    json_ += ",\"GridCurrentA\":\"" + String(powerData_.gridCurrentA, 3) + "\"";
+    json_ += ",\"GridCurrentB\":\"" + String(powerData_.gridCurrentB, 3) + "\"";
+    json_ += ",\"GridCurrentC\":\"" + String(powerData_.gridCurrentC, 3) + "\"";
+    json_ += ",\"PowerFactor\":\"" + String(powerData_.powerFactor, 3) + "\"";
+    json_ += ",\"Standby\":\"" + String(statusData_.isStandby() ? "Yes" : "No") + "\"";
     json_ += "}";
 
 	// Relay node
@@ -600,7 +562,7 @@ void handleRoot(AsyncWebServerRequest* request) {
 
     response_ += fp_.getHtmlFieldset("Inverter");
     response_ += fp_.getHtmlTable();
-    response_ += fp_.getHtmlTableRowText("Polling intervall:", String(gInverterInterval) + "s");
+    response_ += fp_.getHtmlTableRowText("Polling intervall:", String(inverterConfig.getInterval()) + "s");
     response_ += fp_.getHtmlTableRowSpan("Standby:", "no data", "inverterStandby");
     response_ += fp_.getHtmlTableRowSpan("Active Power:", "no data", "inverterActivePower");
     response_ += fp_.getHtmlTableEnd();
@@ -670,9 +632,6 @@ iotwebconf::WifiAuthInfo* handleConnectWifiFailure() {
 }
 
 void convertParams() {
-    strcpy(gInverterIPAddress, InverterIPAddress.value());
-    gInverterPort = InverterPort.value();
-    gInverterInterval = InverterActivePowerInterval.value();
     ArduinoOTA.setHostname(iotWebConf.getThingName());
 }
 

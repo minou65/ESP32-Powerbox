@@ -206,7 +206,8 @@ private:
 class Shelly : public iotwebconf::ChainedParameterGroup, public Consumer {
 public:
     Shelly(const char* id)
-        : ChainedParameterGroup(id, "Shelly") {
+        : ChainedParameterGroup(id, "Shelly"),
+        _sendTimer(5 * 60 * 1000) {
         snprintf(_NameId, STRING_LEN, "%s-name", getId());
         snprintf(_UrlOnId, STRING_LEN, "%s-urlon", getId());
         snprintf(_UrlOffId, STRING_LEN, "%s-urloff", getId());
@@ -293,8 +294,20 @@ private:
     char _UrlOffValue[STRING_LEN];
 
     HTTPClient _http;
+	Status _lastStatus = Disabled;
+	Neotimer _sendTimer; // 5 Minuten
 
     void sendHttpRequest(const String& url) {
+        if (iotWebConf.getState() != iotwebconf::OnLine) return;
+
+        if (_lastStatus != getStatus()) {
+            _lastStatus = getStatus();
+            _sendTimer.start();
+        }
+        else if (!_sendTimer.repeat()) {
+            return;
+        }
+
         _http.begin(url);
         int httpCode = _http.GET();
 
@@ -311,6 +324,77 @@ private:
         _http.end();
     }
 };
+
+class InverterConfig : public iotwebconf::ParameterGroup {
+public:
+    InverterConfig()
+        : iotwebconf::ParameterGroup("SysConf", "Inverter") {
+        snprintf(_IPAddressValue, sizeof(_IPAddressValue), "%s", "192.168.1.105");
+        snprintf(_PortValue, sizeof(_PortValue), "%u", 502);
+        snprintf(_IntervalValue, sizeof(_IntervalValue), "%u", 10);
+
+        addItem(&_IPAddressParam);
+        addItem(&_PortParam);
+        addItem(&_IntervalParam);
+    }
+
+    void applyDefaultValue() {
+        _IPAddressParam.applyDefaultValue();
+        _PortParam.applyDefaultValue();
+        _IntervalParam.applyDefaultValue();
+    }
+
+    String getIPAddress() const { return String(_IPAddressValue); }
+    uint16_t getPort() const { return static_cast<uint16_t>(atoi(_PortValue)); }
+    uint16_t getInterval() const { return static_cast<uint16_t>(atoi(_IntervalValue)); }
+
+private:
+    char _IPAddressValue[STRING_LEN] = { 0 };
+    char _PortValue[NUMBER_LEN] = { 0 };
+    char _IntervalValue[NUMBER_LEN] = { 0 };
+
+    iotwebconf::TextParameter _IPAddressParam = iotwebconf::TextParameter("IPAddress", "InverterIPAddress", _IPAddressValue, STRING_LEN, "192.168.1.105");
+    iotwebconf::NumberParameter _PortParam = iotwebconf::NumberParameter("Port", "InverterPort", _PortValue, NUMBER_LEN, "502", "1..65535", "min='1' max='65535' step='1'");
+    iotwebconf::NumberParameter _IntervalParam = iotwebconf::NumberParameter("Interval (seconds)", "InverterActivePowerInterval", _IntervalValue, NUMBER_LEN, "10", "10..255", "min='10' max='255' step='1'");
+};
+
+class NtpConfig : public iotwebconf::ParameterGroup {
+public:
+    NtpConfig()
+        : iotwebconf::ParameterGroup("TimeSourceGroup", "Time Source") {
+        snprintf(_UseNtpValue, sizeof(_UseNtpValue), "%s", "1");
+        snprintf(_NtpServerValue, sizeof(_NtpServerValue), "%s", "pool.ntp.org");
+        snprintf(_TimeZoneValue, sizeof(_TimeZoneValue), "%s", "CET-1CEST,M3.5.0,M10.5.0/3");
+
+        addItem(&_UseNtpParam);
+        addItem(&_NtpServerParam);
+        addItem(&_TimeZoneParam);
+    }
+
+    void applyDefaultValue() {
+        _UseNtpParam.applyDefaultValue();
+        _NtpServerParam.applyDefaultValue();
+        _TimeZoneParam.applyDefaultValue();
+    }
+
+    bool useNtpServer() const {
+        return (strcmp(_UseNtpValue, "selected") == 0);
+    }
+    String ntpServer() const { return String(_NtpServerValue); }
+    String timeZone() const { return String(_TimeZoneValue); }
+
+private:
+    char _UseNtpValue[STRING_LEN] = { 0 };
+    char _NtpServerValue[STRING_LEN] = { 0 };
+    char _TimeZoneValue[STRING_LEN] = { 0 };
+
+    iotwebconf::CheckboxParameter _UseNtpParam = iotwebconf::CheckboxParameter("Use NTP server", "UseNTPServerParam", _UseNtpValue, STRING_LEN, true);
+    iotwebconf::TextParameter _NtpServerParam = iotwebconf::TextParameter("NTP server (FQDN or IP address)", "NTPServerParam", _NtpServerValue, STRING_LEN, "pool.ntp.org");
+    iotwebconf::TextParameter _TimeZoneParam = iotwebconf::TextParameter("POSIX timezones string", "TimeOffsetParam", _TimeZoneValue, STRING_LEN, "CET-1CEST,M3.5.0,M10.5.0/3");
+};
+
+extern InverterConfig inverterConfig;
+extern NtpConfig ntpConfig;
 
 extern Relay Relay1;
 extern Relay Relay2;

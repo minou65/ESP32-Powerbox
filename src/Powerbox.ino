@@ -30,6 +30,7 @@ bool gUseNTPServer = true;
 const float PV_POWER_RESERVE_ON = 200.0f;   // Einschalt-Reserve
 const float PV_POWER_RESERVE_OFF = 400.0f;  // Ausschalt-Reserve (größer!)
 Neotimer printTimer(60000); // 60 Sekunden
+Inverter inverter(wifiClient);
 
 void setup() {
 	WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable   detector
@@ -40,10 +41,10 @@ void setup() {
 	Serial.println("PV Powerbox v" + String(Version) + " started");
 
 	wifiInit();
-	setupInverter();
+    inverter.begin(inverterConfig.getIPAddress(), inverterConfig.getPort(), inverterConfig.getInterval());
 
-	if (gUseNTPServer) {
-		ntpClient.begin(gNTPServer, gTimeZone, 0);
+	if (ntpConfig.useNtpServer()) {
+		ntpClient.begin(ntpConfig.ntpServer(), ntpConfig.timeZone(), 0);
 	}
 	else {
 		Serial.println(F("NTP not used"));
@@ -54,17 +55,19 @@ void setup() {
     for (Consumer* c_ : consumers) {
         c_->begin();
     }
-
 }
 
 void loop() {
 	wifiLoop();
     if (iotWebConf.getState() == iotwebconf::OnLine) {
 
-		loopInverter();
+		inverter.process();
 
-        float inverterActivePower_ = inverterPowerData.activePower * 1000; // kW to W
-        float gridPower_ = meterData.activePower; // W
+		PowerData powerData_ = inverter.getPowerData();
+		MeterData meterData_ = inverter.getMeterData();
+
+        float inverterActivePower_ = powerData_.activePower * 1000; // kW to W
+        float gridPower_ = meterData_.activePower; // W
 
 		float totalEnabledPower_ = 0;
         for(Consumer* c_ : consumers) {
@@ -122,7 +125,6 @@ void loop() {
             SERIAL_WEB_SERIALF("Total consumer load:%.2f W\n", totalConsumerLoad_);
             SERIAL_WEB_SERIALF("Available PV power:%.2f W\n", availablePVPower_);
             SERIAL_WEB_SERIALLN("----");
-
         }
     }
 	else {
@@ -145,6 +147,13 @@ void loop() {
 			}
 
         }
+
+		inverter.end();
+		inverter.begin(inverterConfig.getIPAddress(), inverterConfig.getPort(), inverterConfig.getInterval());
+
+        if (ntpConfig.useNtpServer()) {
+            ntpClient.begin(ntpConfig.ntpServer(), ntpConfig.timeZone(), 0);
+        }
 	}
 
     if (ShouldReboot) {
@@ -152,7 +161,7 @@ void loop() {
         for (Consumer* c_ : consumers) {
             c_->end();
         }
-		stopInverter();
+		inverter.end();
         delay(1000);
         ESP.restart();
 	}

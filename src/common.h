@@ -16,15 +16,7 @@
 
 extern char Version[];
 
-extern char gInverterIPAddress[15];
-extern int gInverterPort;
-extern uint8_t gInverterInterval;
-
 extern bool gParamsChanged;
-
-extern bool gUseNTPServer;
-extern String gNTPServer;
-extern String gTimeZone;
 
 #endif
 
