@@ -9,6 +9,8 @@
 	#include "WProgram.h"
 #endif
 
+#include <ModbusClientTCP.h>
+
 
 // startet mit Adresse 37100, Laenge 39
 struct MeterData {
@@ -37,10 +39,9 @@ struct MeterData {
     float cPhaseActivePower;           // 37136, 2 Reg, W
     uint16_t meterModelDetection;      // 37138, 1 Reg, UINT16, Meter model detection result
 };
-extern MeterData meterData;
 
 // startet mit Adresse 32064, Laenge 21
-struct InverterPowerData {
+struct PowerData {
 	int startAddress = 32064;
 	int dataLength = 21;
     float inputPower;           // 32064, 2 Reg, kW
@@ -58,9 +59,8 @@ struct InverterPowerData {
     float reactivePower;        // 32082, 2 Reg, kVar
     float powerFactor;          // 32084, 1 Reg, NA
 };
-extern InverterPowerData inverterPowerData;
 
-struct InverterStatusData {
+struct StatusData {
 	// startet mit Adresse 32000, Laenge 7
 	int startAddress = 32000;
 	int dataLength = 7;
@@ -82,12 +82,49 @@ struct InverterStatusData {
     bool isShutdown() const { return state1 & (1 << 8); }
     bool isSpotCheck() const { return state1 & (1 << 9); }
 };
-extern InverterStatusData inverterStatusData;
+
+class Inverter {
+public:
+    Inverter(WiFiClient& client);
+
+    void begin(const String& ipAddress, const uint16_t port = 502, const uint8_t interval = 10);
+    void process();
+    void end();
+
+    PowerData getPowerData() const { return _PowerData; };
+	StatusData getStatusData() const { return _StatusData; };
+	MeterData getMeterData() const { return _MeterData; };
 
 
-void setupInverter();
-void loopInverter();
-void stopInverter();
-void requestInverter(String ip, uint16_t port, uint16_t startaddress, uint16_t number, uint32_t token = millis());
+private:
+    ModbusClientTCP _modbusClient;
+    Neotimer _intervalTimer;
+    enum REQUEST_TYPE { 
+        REQUEST_TYPE_INVERTER = 1001, 
+        REQUEST_TYPE_METER = 1002, 
+        REQUEST_TYPE_STATUS = 1003 
+    };
+    
+    struct RequestContext {
+        REQUEST_TYPE type;
+        uint32_t token;
+    };
+    RequestContext _lastRequest;
+
+    PowerData _PowerData;
+    StatusData _StatusData;
+    MeterData _MeterData;
+
+    char _IPAddress[15] = "0.0.0.0";
+    int _Port = 502;
+
+    void handleMeterData(ModbusMessage response, uint32_t token);
+    void handlePowerData(ModbusMessage response, uint32_t token);
+    void handleStatusData(ModbusMessage response, uint32_t token);
+    void handleData(ModbusMessage response, uint32_t token);
+    void handleError(Error error, uint32_t token);
+    void requestData(const String& ipAddress, uint16_t port, uint16_t startaddress, uint16_t registerCount, uint32_t token);
+};
+extern Inverter inverter;
 
 #endif

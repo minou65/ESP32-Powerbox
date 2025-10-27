@@ -6,29 +6,6 @@
 #include "inverterhandling.h"
 #include "webhandling.h"
 
-uint8_t gInverterInterval = 10;
-
-char gInverterIPAddress[15] = "0.0.0.0";
-int gInverterPort = 502;
-
-InverterPowerData inverterPowerData;
-InverterStatusData inverterStatusData;
-MeterData meterData;
-
-enum REQUEST_TYPE { 
-    REQUEST_TYPE_INVERTER = 1001,
-    REQUEST_TYPE_METER = 1002,
-    REQUEST_TYPE_STATUS = 1003
-};
-struct RequestContext {
-    REQUEST_TYPE type;
-    uint32_t token;
-};
-RequestContext lastRequest;
-
-ModbusClientTCP ModbusClient(wifiClient);
-Neotimer InverterInterval = Neotimer(gInverterInterval * 1000);
-
 uint16_t getU16(const ModbusMessage& msg, uint16_t idx) {
     return (msg[idx] << 8) | msg[idx + 1];
 }
@@ -37,103 +14,154 @@ int32_t getI32(const ModbusMessage& msg, uint16_t idx) {
     return (msg[idx] << 24) | (msg[idx + 1] << 16) | (msg[idx + 2] << 8) | msg[idx + 3];
 }
 
-void handleMeterData(ModbusMessage response, uint32_t token) {
+Inverter::Inverter(WiFiClient& client) : 
+    _modbusClient(client), 
+    _intervalTimer(10 * 1000) // Default 10s
+{
+}
+
+void Inverter::begin(const String& ipAddress, const uint16_t port, const uint8_t interval) {
+    _modbusClient.onErrorHandler([this](Error error, uint32_t token) { handleError(error, token); });
+    _modbusClient.setTimeout(2000, 10);
+    _modbusClient.onDataHandler([this](ModbusMessage response, uint32_t token) { handleData(response, token); });
+    _modbusClient.closeConnectionOnTimeouts(3);
+    _modbusClient.begin();
+    _intervalTimer.start(interval * 1000);
+	ipAddress.toCharArray(_IPAddress, sizeof(_IPAddress));
+	_Port = port;
+}
+
+void Inverter::process() {
+    if (_intervalTimer.repeat()) {
+        requestData(
+            _IPAddress,
+            _Port,
+            _StatusData.startAddress,
+            _StatusData.dataLength,
+            uint32_t(REQUEST_TYPE_STATUS)
+        );
+
+        if (!_StatusData.isStandby()) {
+            requestData(
+                _IPAddress,
+                _Port,
+                _PowerData.startAddress,
+                _PowerData.dataLength,
+                uint32_t(REQUEST_TYPE_INVERTER)
+            );
+
+            requestData(
+                _IPAddress,
+                _Port,
+                _MeterData.startAddress,
+                _MeterData.dataLength,
+                uint32_t(REQUEST_TYPE_METER)
+            );
+        }
+    }
+}
+
+void Inverter::end() {
+    _modbusClient.end();
+}
+
+void Inverter::handleMeterData(ModbusMessage response, uint32_t token) {
     ESP_LOGI("INVERTER", "Received meter data, token=%08X", token);
     uint16_t idx_ = 3; // Modbus data starts at index 3
 
-    meterData.meterStatus = getU16(response, idx_); idx_ += 2;
-    meterData.gridVoltageA = getI32(response, idx_) / 10.0f; idx_ += 4;
-    meterData.gridVoltageB = getI32(response, idx_) / 10.0f; idx_ += 4;
-    meterData.gridVoltageC = getI32(response, idx_) / 10.0f; idx_ += 4;
-    meterData.gridCurrentA = getI32(response, idx_) / 100.0f; idx_ += 4;
-    meterData.gridCurrentB = getI32(response, idx_) / 100.0f; idx_ += 4;
-    meterData.gridCurrentC = getI32(response, idx_) / 100.0f; idx_ += 4;
-    meterData.activePower = getI32(response, idx_) * 1.0f; idx_ += 4;
-    meterData.reactivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
-    meterData.powerFactor = getU16(response, idx_) / 1000.0f; idx_ += 2;
-    meterData.gridFrequency = getU16(response, idx_) / 100.0f; idx_ += 2;
-    meterData.positiveActiveElectricity = getI32(response, idx_) / 100.0f; idx_ += 4;
-    meterData.reverseActivePower = getI32(response, idx_) / 100.0f; idx_ += 4;
-    meterData.accumulatedReactivePower = getI32(response, idx_) / 100.0f; idx_ += 4;
-    meterData.meterType = getU16(response, idx_); idx_ += 2;
-    meterData.abLineVoltage = getI32(response, idx_) / 10.0f; idx_ += 4;
-    meterData.bcLineVoltage = getI32(response, idx_) / 10.0f; idx_ += 4;
-    meterData.caLineVoltage = getI32(response, idx_) / 10.0f; idx_ += 4;
-    meterData.aPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
-    meterData.bPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
-    meterData.cPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
-    meterData.meterModelDetection = getU16(response, idx_);
+    _MeterData.meterStatus = getU16(response, idx_); idx_ += 2;
+    _MeterData.gridVoltageA = getI32(response, idx_) / 10.0f; idx_ += 4;
+    _MeterData.gridVoltageB = getI32(response, idx_) / 10.0f; idx_ += 4;
+    _MeterData.gridVoltageC = getI32(response, idx_) / 10.0f; idx_ += 4;
+    _MeterData.gridCurrentA = getI32(response, idx_) / 100.0f; idx_ += 4;
+    _MeterData.gridCurrentB = getI32(response, idx_) / 100.0f; idx_ += 4;
+    _MeterData.gridCurrentC = getI32(response, idx_) / 100.0f; idx_ += 4;
+    _MeterData.activePower = getI32(response, idx_) * 1.0f; idx_ += 4;
+    _MeterData.reactivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
+    _MeterData.powerFactor = getU16(response, idx_) / 1000.0f; idx_ += 2;
+    _MeterData.gridFrequency = getU16(response, idx_) / 100.0f; idx_ += 2;
+    _MeterData.positiveActiveElectricity = getI32(response, idx_) / 100.0f; idx_ += 4;
+    _MeterData.reverseActivePower = getI32(response, idx_) / 100.0f; idx_ += 4;
+    _MeterData.accumulatedReactivePower = getI32(response, idx_) / 100.0f; idx_ += 4;
+    _MeterData.meterType = getU16(response, idx_); idx_ += 2;
+    _MeterData.abLineVoltage = getI32(response, idx_) / 10.0f; idx_ += 4;
+    _MeterData.bcLineVoltage = getI32(response, idx_) / 10.0f; idx_ += 4;
+    _MeterData.caLineVoltage = getI32(response, idx_) / 10.0f; idx_ += 4;
+    _MeterData.aPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
+    _MeterData.bPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
+    _MeterData.cPhaseActivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
+    _MeterData.meterModelDetection = getU16(response, idx_);
 
     ESP_LOGI("INVERTER", "    Meter voltages: A=%.1f V, B=%.1f V, C=%.1f V",
-        meterData.gridVoltageA,
-        meterData.gridVoltageB,
-        meterData.gridVoltageC);
+        _MeterData.gridVoltageA,
+        _MeterData.gridVoltageB,
+        _MeterData.gridVoltageC);
 
     ESP_LOGI("INVERTER", "    Meter currents: A=%.3f A, B=%.3f A, C=%.3f A",
-        meterData.gridCurrentA,
-        meterData.gridCurrentB,
-        meterData.gridCurrentC);
+        _MeterData.gridCurrentA,
+        _MeterData.gridCurrentB,
+        _MeterData.gridCurrentC);
 
-    ESP_LOGI("INVERTER", "    Meter active power: %.1f W", meterData.activePower);
-    ESP_LOGI("INVERTER", "    Meter reactive power: %.1f Var", meterData.reactivePower);
-    ESP_LOGI("INVERTER", "    Meter frequency: %.2f Hz", meterData.gridFrequency);
-    ESP_LOGI("INVERTER", "    Meter power factor: %.3f", meterData.powerFactor);
+    ESP_LOGI("INVERTER", "    Meter active power: %.1f W", _MeterData.activePower);
+    ESP_LOGI("INVERTER", "    Meter reactive power: %.1f Var", _MeterData.reactivePower);
+    ESP_LOGI("INVERTER", "    Meter frequency: %.2f Hz", _MeterData.gridFrequency);
+    ESP_LOGI("INVERTER", "    Meter power factor: %.3f", _MeterData.powerFactor);
 }
 
-void handlePowerData(ModbusMessage response, uint32_t token) {
+void Inverter::handlePowerData(ModbusMessage response, uint32_t token) {
     ESP_LOGI("INVERTER", "Received inverter power data, token=%08X", token);
     uint16_t idx_ = 3;
-    inverterPowerData.inputPower = getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.gridVoltageAB = getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.gridVoltageBC = getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.gridVoltageCA = getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.phaseAVoltage = getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.phaseBVoltage = getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.phaseCVoltage = getU16(response, idx_) / 10.0f;   idx_ += 2;
-    inverterPowerData.gridCurrentA = getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.gridCurrentB = getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.gridCurrentC = getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.peakActivePowerDay = getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.activePower = getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.reactivePower = getI32(response, idx_) / 1000.0f; idx_ += 4;
-    inverterPowerData.powerFactor = getU16(response, idx_) / 1000.0f;
+    _PowerData.inputPower = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    _PowerData.gridVoltageAB = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    _PowerData.gridVoltageBC = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    _PowerData.gridVoltageCA = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    _PowerData.phaseAVoltage = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    _PowerData.phaseBVoltage = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    _PowerData.phaseCVoltage = getU16(response, idx_) / 10.0f;   idx_ += 2;
+    _PowerData.gridCurrentA = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    _PowerData.gridCurrentB = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    _PowerData.gridCurrentC = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    _PowerData.peakActivePowerDay = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    _PowerData.activePower = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    _PowerData.reactivePower = getI32(response, idx_) / 1000.0f; idx_ += 4;
+    _PowerData.powerFactor = getU16(response, idx_) / 1000.0f;
 
     ESP_LOGI("INVERTER", "    Grid currents: A=%.3f A, B=%.3f A, C=%.3f A",
-        inverterPowerData.gridCurrentA,
-        inverterPowerData.gridCurrentB,
-        inverterPowerData.gridCurrentC);
+        _PowerData.gridCurrentA,
+        _PowerData.gridCurrentB,
+        _PowerData.gridCurrentC);
 
     ESP_LOGI("INVERTER", "    Grid voltages: A=%.1f V, B=%.1f V, C=%.1f V",
-        inverterPowerData.phaseAVoltage,
-        inverterPowerData.phaseBVoltage,
-        inverterPowerData.phaseCVoltage);
+        _PowerData.phaseAVoltage,
+        _PowerData.phaseBVoltage,
+        _PowerData.phaseCVoltage);
 
-    ESP_LOGI("INVERTER", "    Inverter input power: %.3f kW", inverterPowerData.inputPower);
+    ESP_LOGI("INVERTER", "    Inverter input power: %.3f kW", _PowerData.inputPower);
 }
 
-void handleInverterStatusData(ModbusMessage response, uint32_t token) {
+void Inverter::handleStatusData(ModbusMessage response, uint32_t token) {
     ESP_LOGI("INVERTER", "Received inverter status data, token=%08X", token);
     uint16_t idx_ = 3;
 
-    inverterStatusData.state1 = getU16(response, idx_); idx_ += 2;
-    inverterStatusData.state2 = getU16(response, idx_); idx_ += 2;
-    inverterStatusData.state3 = ((uint32_t)getU16(response, idx_) << 16) | getU16(response, idx_ + 2); idx_ += 4;
-    inverterStatusData.alarm1 = getU16(response, idx_); idx_ += 2;
-    inverterStatusData.alarm2 = getU16(response, idx_); idx_ += 2;
-    inverterStatusData.alarm3 = getU16(response, idx_);
+    _StatusData.state1 = getU16(response, idx_); idx_ += 2;
+    _StatusData.state2 = getU16(response, idx_); idx_ += 2;
+    _StatusData.state3 = ((uint32_t)getU16(response, idx_) << 16) | getU16(response, idx_ + 2); idx_ += 4;
+    _StatusData.alarm1 = getU16(response, idx_); idx_ += 2;
+    _StatusData.alarm2 = getU16(response, idx_); idx_ += 2;
+    _StatusData.alarm3 = getU16(response, idx_);
 
     ESP_LOGI("INVERTER", "    Inverter states: state1=0x%04X, state2=0x%04X, state3=0x%08X",
-        inverterStatusData.state1,
-        inverterStatusData.state2,
-        inverterStatusData.state3);
+        _StatusData.state1,
+        _StatusData.state2,
+        _StatusData.state3);
 
     ESP_LOGI("INVERTER", "    Inverter alarms: alarm1=0x%04X, alarm2=0x%04X, alarm3=0x%04X",
-        inverterStatusData.alarm1,
-        inverterStatusData.alarm2,
-        inverterStatusData.alarm3);
+        _StatusData.alarm1,
+        _StatusData.alarm2,
+        _StatusData.alarm3);
 }
 
-void handleData(ModbusMessage response, uint32_t token) {
+void Inverter::handleData(ModbusMessage response, uint32_t token) {
     switch (token) {
     case REQUEST_TYPE_INVERTER:
         handlePowerData(response, token);
@@ -142,7 +170,7 @@ void handleData(ModbusMessage response, uint32_t token) {
         handleMeterData(response, token);
         break;
     case REQUEST_TYPE_STATUS:
-        handleInverterStatusData(response, token);
+        handleStatusData(response, token);
         break;
     default:
         ESP_LOGW("INVERTER", "Unknown REQUEST_TYPE!");
@@ -150,21 +178,21 @@ void handleData(ModbusMessage response, uint32_t token) {
     }
 }
 
-void handleError(Error error, uint32_t token) {
+void Inverter::handleError(Error error, uint32_t token) {
     ModbusError me_(error);
     ESP_LOGE("INVERTER", "Error response: %02X - %s", (int)me_, (const char*)me_);
 }
 
-void requestInverter(const String ipAddress, uint16_t port, uint16_t startaddress, uint16_t registerCount, uint32_t token) {
+void Inverter::requestData(const String& ipAddress, uint16_t port, uint16_t startaddress, uint16_t registerCount, uint32_t token) {
     IPAddress host_;
     if (!host_.fromString(ipAddress)) {
         ESP_LOGE("INVERTER", "Invalid IP address: %s", ipAddress.c_str());
         return;
     }
-    ModbusClient.setTarget(host_, port);
+    _modbusClient.setTarget(host_, port);
     uint8_t slave_ = 1;
 
-    Error err_ = ModbusClient.addRequest(token, slave_, READ_HOLD_REGISTER, startaddress, registerCount);
+    Error err_ = _modbusClient.addRequest(token, slave_, READ_HOLD_REGISTER, startaddress, registerCount);
     if (err_ != SUCCESS) {
         ModbusError e_(err_);
         ESP_LOGE("INVERTER", "Error creating request: %02X - %s", (int)e_, (const char*)e_);
@@ -173,53 +201,4 @@ void requestInverter(const String ipAddress, uint16_t port, uint16_t startaddres
         ESP_LOGI("INVERTER", "Request sent to inverter at %s:%d, start address=%d, count=%d, token=%08X",
             ip.c_str(), port, startaddress, registerCount, token);
     }
-}
-
-void setupInverter() {
-    ModbusClient.onErrorHandler(&handleError);
-    ModbusClient.setTimeout(2000, 10);
-    ModbusClient.onDataHandler(&handleData);
-	ModbusClient.closeConnectionOnTimeouts(3);
-    ModbusClient.begin();
-    InverterInterval.start();
-}
-
-void loopInverter() {
-    if (gParamsChanged) {
-        InverterInterval.start(gInverterInterval * 1000);
-    }
-
-    if (InverterInterval.repeat()) {
-        requestInverter(
-            gInverterIPAddress, 
-            gInverterPort, 
-            inverterStatusData.startAddress, 
-            inverterStatusData.dataLength, 
-            uint32_t(REQUEST_TYPE_STATUS)
-		);
-
-        if (inverterStatusData.isStandby()){
-            // Serial.println("Inverter is in standby mode, skipping power and meter data request.");
-		}
-        
-        requestInverter(
-            gInverterIPAddress, 
-            gInverterPort, 
-            inverterPowerData.startAddress, 
-            inverterPowerData.dataLength, 
-            uint32_t(REQUEST_TYPE_INVERTER)
-        );
-
-        requestInverter(
-            gInverterIPAddress,
-            gInverterPort,
-            meterData.startAddress,
-            meterData.dataLength,
-            uint32_t(REQUEST_TYPE_METER)
-		);
-    }
-}
-
-void stopInverter() {
-    ModbusClient.end();
 }
