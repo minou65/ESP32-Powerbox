@@ -8,8 +8,7 @@
 #include "inverterhandling.h"
 
 #include <DNSServer.h>
-#include <IotWebConf.h>
-#include <IotWebConfAsyncClass.h>
+
 #include <IotWebConfAsyncUpdateServer.h>
 #include <IotWebRoot.h>
 #include <IotWebConfUsing.h>
@@ -58,36 +57,118 @@ AsyncWebServer server(80);
 AsyncWebServerWrapper asyncWebServerWrapper(&server);
 AsyncUpdateServer AsyncUpdater;
 
-std::vector<Consumer*> consumers = {
-    &Relay1, &Relay2, &Relay3, &Relay4,
-    &Shelly1, &Shelly2, &Shelly3, &Shelly4, &Shelly5, &Shelly6, &Shelly7, &Shelly8, &Shelly9, &Shelly10
-};
+const char html_form_end[] PROGMEM = R"=====(
+</br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>
+</br><a href='/'>Home</a>
+</br><a href='#' onclick="postReset()">Reset to factory defaults</a>
+<script>
+function postReset() {
+    fetch('/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'reset=true'
+    })
+    .then(response => {
+        if (response.ok) { window.location.href = '/'; }
+    })
+    .catch(error => {
+        console.error('Reset fehlgeschlagen:', error);
+    });
+}
+</script>
+)=====";
 
+const char html_end_template[] PROGMEM = R"=====(
+</div></body></html>
+    <script>
+        function updateDeviceFields(deviceNum) {
+            var typeSelect = document.getElementById('Device' + deviceNum + '-typeselect');
+            var type = typeSelect.value;
+
+            var fields = [
+                'designation',
+                'power',
+                'delay',
+                'ontime',
+                'offtime',
+                'relayselect',
+                'urlon',
+                'urloff',
+                'partialloadfactor',
+                'partialloadallowed'
+            ];
+
+            // Hide all fields first
+            fields.forEach(function (field) {
+                var el = document.getElementById('Device' + deviceNum + '-' + field);
+                if (el) el.parentElement.style.display = 'none';
+            });
+
+            if (type !== '-') {
+                // Show common fields
+                ['designation', 'power', 'delay', 'ontime', 'offtime'].forEach(function (field) {
+                    var el = document.getElementById('Device' + deviceNum + '-' + field);
+                    if (el) el.parentElement.style.display = '';
+                });
+
+                // Show specific fields
+                if (type === 'Relay') {
+                    var el = document.getElementById('Device' + deviceNum + '-relayselect');
+                    if (el) el.parentElement.style.display = '';
+                } else if (type === 'URL') {
+                    ['urlon', 'urloff'].forEach(function (field) {
+                        var el = document.getElementById('Device' + deviceNum + '-' + field);
+                        if (el) el.parentElement.style.display = '';
+                    });
+                }
+
+                // Show partial load checkbox always
+                var partialLoadAllowedEl = document.getElementById('Device' + deviceNum + '-partialloadallowed');
+                if (partialLoadAllowedEl) partialLoadAllowedEl.parentElement.style.display = '';
+
+                // Show/hide partial load factor depending on checkbox
+                var partialLoadFactorEl = document.getElementById('Device' + deviceNum + '-partialloadfactor');
+                if (partialLoadAllowedEl && partialLoadFactorEl) {
+                    if (partialLoadAllowedEl.checked) {
+                        partialLoadFactorEl.parentElement.style.display = '';
+                    } else {
+                        partialLoadFactorEl.parentElement.style.display = 'none';
+                    }
+                }
+            }
+        }
+
+        // Initial setup and event binding for all devices
+        for (var i = 1; i <= 10; i++) {
+            (function (i) {
+                var select = document.getElementById('Device' + i + '-typeselect');
+                var partialLoadAllowedEl = document.getElementById('Device' + i + '-partialloadallowed');
+                if (select) {
+                    select.addEventListener('change', function () {
+                        updateDeviceFields(i);
+                    });
+                }
+                if (partialLoadAllowedEl) {
+                    partialLoadAllowedEl.addEventListener('change', function () {
+                        updateDeviceFields(i);
+                    });
+                }
+                // Initial call
+                updateDeviceFields(i);
+            })(i);
+        }
+    </script>
+)=====";
 
 class CustomHtmlFormatProvider : public iotwebconf::OptionalGroupHtmlFormatProvider {
 protected:
-    virtual String getFormEnd() {
-        String s_ = OptionalGroupHtmlFormatProvider::getFormEnd();
-        s_ += F("</br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>");
-        s_ += F("</br><a href='/'>Home</a>");
-        s_ += F("</br><a href='#' onclick=\"postReset()\">Reset to factory defaults</a>");
-        s_ += F("<script>"
-            "function postReset() {"
-            "fetch('/post', {"
-            "method: 'POST',"
-            "headers: { 'Content-Type': 'application/x-www-form-urlencoded' },"
-            "body: 'reset=true'"
-            "})"
-            ".then(response => {"
-            "if (response.ok) { window.location.href = '/'; }"
-            "})"
-            ".catch(error => {"
-            "console.error('Reset fehlgeschlagen:', error);"
-            "});"
-            "}"
-            "</script>");
-        return s_;
+    String getFormEnd() override {
+        return OptionalGroupHtmlFormatProvider::getFormEnd() + String(FPSTR(html_form_end));
 	}
+    String getEnd() override {
+        return String(FPSTR(html_end_template)) + HtmlFormatProvider::getEnd();
+                
+    }
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
 
@@ -102,7 +183,7 @@ public:
     }
 
 protected:
-    virtual String getStyleInner() {
+    String getStyleInner() override {
         String s_ = HtmlRootFormatProvider::getStyleInner();
         s_ += F(".led {display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }\n");
         s_ += F(".led.off {background-color: grey;}\n");
@@ -111,7 +192,7 @@ protected:
         return s_;
     }
 
-    virtual String getScriptInner() {
+    String getScriptInner() override {
         String s_ = HtmlRootFormatProvider::getScriptInner();
 
         s_.replace("{millisecond}", "5000");
@@ -150,11 +231,6 @@ protected:
         s_ += F("   document.getElementById('inverterStandby').innerHTML = jsonData.Inverter.Standby \n");
         s_ += F("   document.getElementById('inverterActivePower').innerHTML = jsonData.Inverter.ActivePower + \"W\" \n");
 
-        s_ += F("   updateLED(document.getElementById('relay1'), jsonData.Relays.relay1.toLowerCase());\n");
-        s_ += F("   updateLED(document.getElementById('relay2'), jsonData.Relays.relay2.toLowerCase());\n");
-        s_ += F("   updateLED(document.getElementById('relay3'), jsonData.Relays.relay3.toLowerCase());\n");
-        s_ += F("   updateLED(document.getElementById('relay4'), jsonData.Relays.relay4.toLowerCase());\n");
-
         // Set grid power direction
         s_ += F("   if (parseFloat(jsonData.Grid.ActivePower) > 0) {\n");
         s_ += F("       document.getElementById('gridPowerDirection').innerHTML = \"to Grid\";\n");
@@ -162,14 +238,10 @@ protected:
         s_ += F("       document.getElementById('gridPowerDirection').innerHTML = \"from Grid\";\n");
         s_ += F("   }\n");
 
-        Shelly* shelly_ = &Shelly1;
-        uint8_t i_ = 1;
-        while (shelly_ != nullptr) {
-            if (shelly_->isActive()) {
-                s_ += "   updateLED(document.getElementById('shelly" + String(i_) + "'), jsonData.Shellys.shelly" + String(i_) + ".toLowerCase());\n";
+        for (size_t i_ = 0; i_ < devices.size(); ++i_) {
+            if (devices[i_]->isActive()) {
+                s_ += "   updateLED(document.getElementById('device" + String(i_ + 1) + "'), jsonData.SwitchDevices.device" + String(i_ + 1) + ".toLowerCase());\n";
             }
-            shelly_ = (Shelly*)shelly_->getNext();
-            i_++;
         }
 
         s_ += F("}\n");
@@ -178,27 +250,12 @@ protected:
     }
 };
 
-IotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
+AsyncIotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
 
 InverterConfig inverterConfig = InverterConfig();
 NtpConfig ntpConfig = NtpConfig();
 
-Relay Relay1 = Relay("Relay1", GPIO_NUM_22);
-Relay Relay2 = Relay("Relay2", GPIO_NUM_21);
-Relay Relay3 = Relay("Relay3", GPIO_NUM_17);
-Relay Relay4 = Relay("Relay4", GPIO_NUM_16);
-
-
-Shelly Shelly1 = Shelly("Shelly1");
-Shelly Shelly2 = Shelly("Shelly2");
-Shelly Shelly3 = Shelly("Shelly3");
-Shelly Shelly4 = Shelly("Shelly4");
-Shelly Shelly5 = Shelly("Shelly5");
-Shelly Shelly6 = Shelly("Shelly6");
-Shelly Shelly7 = Shelly("Shelly7");
-Shelly Shelly8 = Shelly("Shelly8");
-Shelly Shelly9 = Shelly("Shelly9");
-Shelly Shelly10 = Shelly("Shelly10");
+std::vector<SwitchDevice*> devices;
 
 void wifiInit() {
     Serial.begin(115200);
@@ -211,38 +268,21 @@ void wifiInit() {
 
     iotWebConf.setHtmlFormatProvider(&customHtmlFormatProvider);
 
-    Relay1.setNext(&Relay2);
-    Relay2.setNext(&Relay3);
-    Relay3.setNext(&Relay4);
-
-    Shelly1.setNext(&Shelly2);
-    Shelly2.setNext(&Shelly3);
-    Shelly3.setNext(&Shelly4);
-    Shelly4.setNext(&Shelly5);
-    Shelly5.setNext(&Shelly6);
-    Shelly6.setNext(&Shelly7);
-    Shelly7.setNext(&Shelly8);
-    Shelly8.setNext(&Shelly9);
-    Shelly9.setNext(&Shelly10);
+	// -- Create SwitchDevice instances and chain them.
+    SwitchDevice* prev_ = nullptr;
+    for (int i_ = 1; i_ <= 10; ++i_) {
+        auto* dev_ = new SwitchDevice(("Device" + String(i_)).c_str());
+        devices.push_back(dev_);
+        if (prev_) prev_->setNext(dev_);
+        prev_ = dev_;
+    }
 
     iotWebConf.addParameterGroup(&inverterConfig);
 	iotWebConf.addParameterGroup(&ntpConfig);
 
-    iotWebConf.addParameterGroup(&Relay1);
-    iotWebConf.addParameterGroup(&Relay2);
-    iotWebConf.addParameterGroup(&Relay3);
-    iotWebConf.addParameterGroup(&Relay4);
-
-    iotWebConf.addParameterGroup(&Shelly1);
-    iotWebConf.addParameterGroup(&Shelly2);
-    iotWebConf.addParameterGroup(&Shelly3);
-    iotWebConf.addParameterGroup(&Shelly4);
-    iotWebConf.addParameterGroup(&Shelly5);
-    iotWebConf.addParameterGroup(&Shelly6);
-    iotWebConf.addParameterGroup(&Shelly7);
-    iotWebConf.addParameterGroup(&Shelly8);
-    iotWebConf.addParameterGroup(&Shelly9);
-    iotWebConf.addParameterGroup(&Shelly10);
+    for (auto device_ : devices) {
+        iotWebConf.addParameterGroup(device_);
+    }
 
     // -- Define how to handle updateServer calls.
     iotWebConf.setupUpdateServer(
@@ -268,19 +308,19 @@ void wifiInit() {
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) { handleRoot(request); });
 
     server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse* response = request->beginResponse_P(200, "image/x-icon", favicon_ico, sizeof(favicon_ico));
-        request->send(response);
+        AsyncWebServerResponse* response_ = request->beginResponse_P(200, "image/x-icon", favicon_ico, sizeof(favicon_ico));
+        request->send(response_);
         }
     );
 
     server.on("/config", HTTP_ANY, [](AsyncWebServerRequest* request) {
-        auto* asyncWebRequestWrapper = new AsyncWebRequestWrapper(request, 32000);
-        iotWebConf.handleConfig(asyncWebRequestWrapper);
+        auto* asyncWebRequestWrapper_ = new AsyncWebRequestWrapper(request);
+        iotWebConf.handleConfig(asyncWebRequestWrapper_);
         }
     );
 
     server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse* response = request->beginResponse(200, "text/html",
+        AsyncWebServerResponse* response_ = request->beginResponse(200, "text/html",
             "<html>"
             "<head>"
             "<meta http-equiv=\"refresh\" content=\"15; url=/\">"
@@ -292,7 +332,7 @@ void wifiInit() {
             "</body>"
             "</html>");
         request->client()->setNoDelay(true); // Disable Nagle's algorithm so the client gets the response immediately
-        request->send(response);
+        request->send(response_);
         ShouldReboot = true;
         }
     );
@@ -303,8 +343,8 @@ void wifiInit() {
     server.on("/post", HTTP_POST, [](AsyncWebServerRequest* request) { handlePost(request); });
 
     server.onNotFound([](AsyncWebServerRequest* request) {
-        AsyncWebRequestWrapper asyncWebRequestWrapper(request);
-        iotWebConf.handleNotFound(&asyncWebRequestWrapper);
+        AsyncWebRequestWrapper asyncWebRequestWrapper_(request);
+        iotWebConf.handleNotFound(&asyncWebRequestWrapper_);
         }
     );
 
@@ -327,12 +367,12 @@ void wifiConnected(){
 }
 
 void onProgress(size_t prg, size_t sz) {
-    static size_t lastPrinted = 0;
-    size_t currentPercent = (prg * 100) / sz;
+    static size_t lastPrinted_ = 0;
+    size_t currentPercent_ = (prg * 100) / sz;
 
-    if (currentPercent % 5 == 0 && currentPercent != lastPrinted) {
-        Serial.printf("Progress: %d%%\n", currentPercent);
-        lastPrinted = currentPercent;
+    if (currentPercent_ % 5 == 0 && currentPercent_ != lastPrinted_) {
+        Serial.printf("Progress: %d%%\n", currentPercent_);
+        lastPrinted_ = currentPercent_;
     }
 }
 
@@ -391,55 +431,34 @@ void handleData(AsyncWebServerRequest* request) {
     json_ += ",\"Standby\":\"" + String(statusData_.isStandby() ? "Yes" : "No") + "\"";
     json_ += "}";
 
-	// Relay node
-    json_ += ",\"Relays\":{";
-    Relay* relay_ = &Relay1;
-    uint8_t i_ = 1;
-    while (relay_ != nullptr) {
-        switch(relay_->getStatus()) {
-            case Consumer::Enabled:
-                json_ += "\"relay" + String(i_) + "\":\"On\"";
+    json_ += ",\"SwitchDevices\":{";
+    for (size_t i_ = 0; i_ < devices.size(); ++i_) {
+        if (devices[i_]->isActive()) {
+            switch (devices[i_]->getStatus()) {
+            case SwitchDevice::Enabled:
+                json_ += "\"device" + String(i_ + 1) + "\":\"On\"";
                 break;
-            case Consumer::DelayedOff:
-                json_ += "\"relay" + String(i_) + "\":\"DelayedOff\"";
+            case  SwitchDevice::DelayedOff:
+                json_ += "\"device" + String(i_ + 1) + "\":\"DelayedOff\"";
                 break;
-            case Consumer::Disabled:
+            case  SwitchDevice::Disabled:
             default:
-                json_ += "\"relay" + String(i_) + "\":\"Off\"";
+                json_ += "\"device" + String(i_ + 1) + "\":\"Off\"";
                 break;
-		}
-        relay_ = (Relay*)relay_->getNext();
-        if (relay_ != nullptr) {
-			json_ += ",";
-		}
-		i_++;
-    }
-    json_ += "}";
-
-	// Shelly node
-    json_ += ",\"Shellys\":{";
-    Shelly* shelly_ = &Shelly1;
-    i_ = 1;
-    while (shelly_ != nullptr) {
-        if (shelly_->isActive()) {
-            switch (shelly_->getStatus()) {
-                case Consumer::Enabled:
-                    json_ += "\"shelly" + String(i_) + "\":\"On\"";
-                    break;
-                case Consumer::DelayedOff:
-                    json_ += "\"shelly" + String(i_) + "\":\"DelayedOff\"";
-                    break;
-                case Consumer::Disabled:
-                default:
-                    json_ += "\"shelly" + String(i_) + "\":\"Off\"";
-                    break;
-			}
+            }
+            // Komma nur, wenn noch ein aktives Device folgt
+            if (i_ + 1 < devices.size()) {
+                // Suche, ob noch ein aktives Device folgt
+                bool moreActive_ = false;
+                for (size_t j_ = i_ + 1; j_ < devices.size(); ++j_) {
+                    if (devices[j_]->isActive()) {
+                        moreActive_ = true;
+                        break;
+                    }
+                }
+                if (moreActive_) json_ += ",";
+            }
         }
-        shelly_ = (Shelly*)shelly_->getNext();
-        if ((shelly_ != nullptr) && (shelly_->isActive())) {
-            json_ += ",";
-        }
-        i_++;
     }
     json_ += "}";
     json_ += "}";
@@ -447,36 +466,11 @@ void handleData(AsyncWebServerRequest* request) {
 }
 
 void handlePost(AsyncWebServerRequest* request) {
-    if (request->hasParam("relay1", true)) {
-        String value_ = request->getParam("relay1", true)->value();
-        if (value_ == "on") {
-            Relay1.setEnabled(true);
-        } else {
-            Relay1.setEnabled(false);
-        }
-    }
-    if (request->hasParam("relay2", true)) {
-        String value_ = request->getParam("relay2", true)->value();
-        if (value_ == "on") {
-            Relay2.setEnabled(true);
-        } else {
-            Relay2.setEnabled(false);
-        }
-    }
-    if (request->hasParam("relay3", true)) {
-        String value_ = request->getParam("relay3", true)->value();
-        if (value_ == "on") {
-            Relay3.setEnabled(true);
-        } else {
-            Relay3.setEnabled(false);
-        }
-    }
-    if (request->hasParam("relay4", true)) {
-        String value_ = request->getParam("relay4", true)->value();
-        if (value_ == "on") {
-            Relay4.setEnabled(true);
-        } else {
-            Relay4.setEnabled(false);
+    for (size_t i_ = 0; i_ < devices.size(); ++i_) {
+        String paramName = "device" + String(i_ + 1);
+        if (request->hasParam(paramName, true)) {
+            String value_ = request->getParam(paramName, true)->value();
+            devices[i_]->setEnabled(value_ == "on");
         }
     }
 
@@ -484,11 +478,11 @@ void handlePost(AsyncWebServerRequest* request) {
         String value_ = request->getParam("reset", true)->value();
         if (value_ == "true") {
             Serial.println("apply default values...");
-            for (auto consumer_ : consumers) {
-                consumer_->applyDefaultValue();
-			}
+            for (auto device_ : devices) {
+                device_->applyDefaultValue();
+            }
         }
-	}
+    }
 
     request->redirect("/");
 }
@@ -568,34 +562,17 @@ void handleRoot(AsyncWebServerRequest* request) {
     response_ += fp_.getHtmlTableEnd();
     response_ += fp_.getHtmlFieldsetEnd();
 
-    response_ += fp_.getHtmlFieldset("Relays");
+    response_ += fp_.getHtmlFieldset("Device");
     response_ += fp_.getHtmlTable();
-    Relay* relay_ = &Relay1;
-    uint8_t i_ = 1;
-    while (relay_ != nullptr) {
-        response_ += fp_.getHtmlTableRowClass(relay_->getName() + ":", "led off", "relay" + String(i_));
-		relay_ = (Relay*)relay_->getNext();
-		i_++;
-	}
+    for (size_t i_ = 0; i_ < devices.size(); ++i_) {
+        if (devices[i_]->isActive()) {
+            response_ += fp_.getHtmlTableRowClass(
+                devices[i_]->getDesignation() + ":", "led off", "device" + String(i_ + 1)
+            );
+        }
+    }
     response_ += fp_.getHtmlTableEnd();
     response_ += fp_.getHtmlFieldsetEnd();
-
-    Shelly* shelly_ = &Shelly1;
-    if (shelly_->isActive()) {
-        response_ += fp_.getHtmlFieldset("Shellys");
-        response_ += fp_.getHtmlTable();
-
-        i_ = 1;
-        while (shelly_ != nullptr) {
-            if (shelly_->isActive()) {
-                response_ += fp_.getHtmlTableRowClass(shelly_->getName() + ":", "led off", "shelly" + String(i_));
-            }
-            shelly_ = (Shelly*)shelly_->getNext();
-            i_++;
-        }
-        response_ += fp_.getHtmlTableEnd();
-        response_ += fp_.getHtmlFieldsetEnd();
-    }
 
     response_ += fp_.getHtmlFieldset("Network");
     response_ += fp_.getHtmlTable();
