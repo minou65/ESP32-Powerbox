@@ -52,8 +52,8 @@ void setup() {
 
 	printTimer.start();
 
-    for (Consumer* c_ : consumers) {
-        c_->begin();
+    for (auto device_ : devices) {
+        device_->begin();
     }
 }
 
@@ -70,10 +70,10 @@ void loop() {
         float gridPower_ = meterData_.activePower; // W
 
 		float totalEnabledPower_ = 0;
-        for(Consumer* c_ : consumers) {
-            float power_ = c_->getPower();
-            float partialPower_ = power_ * c_->getPartialLoadThreshold();
-            if (c_->isEnabled() && c_->isActive()) {
+        for(auto device_ : devices) {
+            float power_ = device_->getPower();
+            float partialPower_ = power_ * device_->getPartialLoadThreshold();
+            if (device_->isEnabled() && device_->isActive()) {
                 totalEnabledPower_ += power_;
             }
 		}
@@ -91,28 +91,27 @@ void loop() {
             availablePVPower_ = 0;
         }
 
-        for (Consumer* c_ : consumers) {
-            c_->setEnabled(false);
+        for (auto device_ : devices) {
+           device_->setEnabled(false);
         }
 
         float remainingPVPower_ = availablePVPower_;
         float totalConsumerLoad_ = 0;
-        for (Consumer* c_ : consumers) {
-            float power_ = c_->getPower();
-			float partialPower_ = power_ * c_->getPartialLoadThreshold();
-            if (c_->isActive() && (
+        for (auto device_ : devices) {
+            float power_ =device_->getPower();
+			float partialPower_ = power_ *device_->getPartialLoadThreshold();
+            if (device_->isActive() && (
                 power_ <= remainingPVPower_ ||
-                (c_->isPartialLoadAllowed() && partialPower_ <= remainingPVPower_)
+                (device_->isPartialLoadAllowed() && partialPower_ <= remainingPVPower_)
                 )) {
-                c_->setEnabled(true);
+               device_->setEnabled(true);
                 remainingPVPower_ -= power_;
                 totalConsumerLoad_ += power_;
             }
         }
 
-        // For each consumer, call process
-        for (Consumer* c_ : consumers) {
-            c_->process();
+        for (auto device_ : devices) {
+           device_->process();
         }
 
         if (ntpClient.isInitialized()) {
@@ -128,22 +127,22 @@ void loop() {
         }
     }
 	else {
-        for (Consumer* c_ : consumers) {
-            if (c_->isEnabled() && c_->isActive()) {
-                c_->setEnabled(false);
-                SERIAL_WEB_SERIALF("Disabled consumer: %s\n", c_->getName().c_str());
+        for (auto device_ : devices) {
+            if (device_->isEnabled() &&device_->isActive()) {
+               device_->setEnabled(false);
+               SERIAL_WEB_SERIALF("Disabled consumer: %s\n",device_->getDesignation().c_str());
             }
         };
 	}
 
 	if (gParamsChanged) {
-        for (Consumer* c_ : consumers) {
-            c_->end();
-            c_->begin();
+        for (auto device_ : devices) {
+           device_->end();
+           device_->begin();
 
-            if (!c_->isActive()){
-                c_->setEnabled(false);
-				c_->applyDefaultValue();
+            if (!device_->isActive()){
+               device_->setEnabled(false);
+               device_->applyDefaultValue();
 			}
 
         }
@@ -158,8 +157,8 @@ void loop() {
 
     if (ShouldReboot) {
         SERIAL_WEB_SERIALLN("Rebooting...");
-        for (Consumer* c_ : consumers) {
-            c_->end();
+        for (auto device_ : devices) {
+           device_->end();
         }
 		inverter.end();
         delay(1000);
