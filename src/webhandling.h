@@ -4,7 +4,6 @@
 #ifndef _WEBHANDLING_h
 #define _WEBHANDLING_h
 
-#include <vector>
 #include <HTTPClient.h>
 
 #include <IotWebConf.h>
@@ -35,6 +34,8 @@
 
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
 const char wifiInitialApPassword[] = "123456789";
+
+#define MAX_DEVICES 10
 
 extern void wifiInit();
 extern void wifiLoop();
@@ -71,13 +72,11 @@ public:
     enum DeviceType {notdefined, RelayType, UrlType };
     enum Status { Disabled, Enabled, DelayedOff };
 
-        SwitchDevice(const char* id)
-            :
-            _id(id),
-            ChainedParameterGroup(_id.c_str(), "Device")
+        SwitchDevice(const char* id, const char* label) :
+            ChainedParameterGroup(id, label)
         {
 
-        snprintf(_DesignationValue, STRING_LEN, "%s", _id);
+        snprintf(_DesignationValue, STRING_LEN, "%s", this->getId());
         snprintf(_PowerValue, NUMBER_LEN, "%u", 0);
         snprintf(_DelayValue, NUMBER_LEN, "%u", 1);
         snprintf(_OnTimeValue, STRING_LEN, "00:00");
@@ -85,17 +84,17 @@ public:
         snprintf(_UrlOnValue, STRING_LEN, "http://");
         snprintf(_UrlOffValue, STRING_LEN, "http://");
 
-        snprintf(_DesignationId, STRING_LEN, "%s-designation", _id);
-        snprintf(_PowerId, STRING_LEN, "%s-power", _id);
-        snprintf(_DelayId, STRING_LEN, "%s-delay", _id);
-        snprintf(_OnTimeId, STRING_LEN, "%s-ontime", _id);
-        snprintf(_OffTimeId, STRING_LEN, "%s-offtime", _id);
-        snprintf(_UrlOnId, STRING_LEN, "%s-urlon", _id);
-        snprintf(_UrlOffId, STRING_LEN, "%s-urloff", _id);
-		snprintf(_TypeSelectId, STRING_LEN, "%s-typeselect", _id);
-        snprintf(_RelaySelectId, STRING_LEN, "%s-relayselect", _id);
-		snprintf(_PartialLoadFactorId, STRING_LEN, "%s-partialloadfactor", _id);
-		snprintf(_PartialLoadAllowedId, STRING_LEN, "%s-partialloadallowed", _id);
+        snprintf(_DesignationId, STRING_LEN, "%s-designation", this->getId());
+        snprintf(_PowerId, STRING_LEN, "%s-power", this->getId());
+        snprintf(_DelayId, STRING_LEN, "%s-delay", this->getId());
+        snprintf(_OnTimeId, STRING_LEN, "%s-ontime", this->getId());
+        snprintf(_OffTimeId, STRING_LEN, "%s-offtime", this->getId());
+        snprintf(_UrlOnId, STRING_LEN, "%s-urlon", this->getId());
+        snprintf(_UrlOffId, STRING_LEN, "%s-urloff", this->getId());
+		snprintf(_TypeSelectId, STRING_LEN, "%s-typeselect", this->getId());
+        snprintf(_RelaySelectId, STRING_LEN, "%s-relayselect", this->getId());
+		snprintf(_PartialLoadFactorId, STRING_LEN, "%s-partialloadfactor", this->getId());
+		snprintf(_PartialLoadAllowedId, STRING_LEN, "%s-partialloadallowed", this->getId());
 
         addItem(&_TypeSelectParam);
         addItem(&_DesignationParam);
@@ -248,8 +247,6 @@ private:
 	char _RelaySelectId[STRING_LEN];
 	char _PartialLoadFactorId[STRING_LEN];
 	char _PartialLoadAllowedId[STRING_LEN];
-
-    String _id;
 
     iotwebconf::TextParameter _DesignationParam = iotwebconf::TextParameter("Device Name", _DesignationId, _DesignationValue, STRING_LEN, "");
     iotwebconf::NumberParameter _PowerParam = iotwebconf::NumberParameter("Power (W)", _PowerId, _PowerValue, NUMBER_LEN, "0", "0..10000", "min='0' max='10000' step='1'");
@@ -404,7 +401,7 @@ private:
 extern InverterConfig inverterConfig;
 extern NtpConfig ntpConfig;
 
-extern std::vector<SwitchDevice*> devices;
+extern SwitchDevice device[MAX_DEVICES];
 
 #endif
 

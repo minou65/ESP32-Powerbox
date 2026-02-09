@@ -7,6 +7,7 @@
 
 */
 
+#define IOTWEBCONF_DEBUG_DISABLED
 
 #include "ntp.h"
 #include <IotWebConf.h>
@@ -52,31 +53,31 @@ void setup() {
 
 	printTimer.start();
 
-    for (auto device_ : devices) {
-        device_->begin();
+    for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+        device[i_].begin();
     }
 }
 
 void loop() {
-	wifiLoop();
+    wifiLoop();
     if (iotWebConf.getState() == iotwebconf::OnLine) {
 
-		inverter.process();
+        inverter.process();
 
-		PowerData powerData_ = inverter.getPowerData();
-		MeterData meterData_ = inverter.getMeterData();
+        PowerData powerData_ = inverter.getPowerData();
+        MeterData meterData_ = inverter.getMeterData();
 
         float inverterActivePower_ = powerData_.activePower * 1000; // kW to W
         float gridPower_ = meterData_.activePower; // W
 
-		float totalEnabledPower_ = 0;
-        for(auto device_ : devices) {
-            float power_ = device_->getPower();
-            float partialPower_ = power_ * device_->getPartialLoadThreshold();
-            if (device_->isEnabled() && device_->isActive()) {
+        float totalEnabledPower_ = 0;
+        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+            float power_ = device[i_].getPower();
+            float partialPower_ = power_ * device[i_].getPartialLoadThreshold();
+            if (device[i_].isEnabled() && device[i_].isActive()) {
                 totalEnabledPower_ += power_;
             }
-		}
+        }
 
         // Calculate available PV power
         // Note: In the inverter, gridPower_ > 0 means feed-in, gridPower_ < 0 means grid consumption!
@@ -84,34 +85,34 @@ void loop() {
         if (gridPower_ > 0) {
             availablePVPower_ = gridPower_ - PV_POWER_RESERVE_ON + totalEnabledPower_;
             if (availablePVPower_ < 0) availablePVPower_ = 0;
-			if (availablePVPower_ > inverterActivePower_) availablePVPower_ = inverterActivePower_;
+            if (availablePVPower_ > inverterActivePower_) availablePVPower_ = inverterActivePower_;
         }
         else {
             // Power is being drawn from the grid or balanced: no PV surplus available
             availablePVPower_ = 0;
         }
 
-        for (auto device_ : devices) {
-           device_->setEnabled(false);
+        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+            device[i_].setEnabled(false);
         }
 
         float remainingPVPower_ = availablePVPower_;
         float totalConsumerLoad_ = 0;
-        for (auto device_ : devices) {
-            float power_ =device_->getPower();
-			float partialPower_ = power_ *device_->getPartialLoadThreshold();
-            if (device_->isActive() && (
+        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+            float power_ = device[i_].getPower();
+            float partialPower_ = power_ * device[i_].getPartialLoadThreshold();
+            if (device[i_].isActive() && (
                 power_ <= remainingPVPower_ ||
-                (device_->isPartialLoadAllowed() && partialPower_ <= remainingPVPower_)
+                (device[i_].isPartialLoadAllowed() && partialPower_ <= remainingPVPower_)
                 )) {
-               device_->setEnabled(true);
+                device[i_].setEnabled(true);
                 remainingPVPower_ -= power_;
                 totalConsumerLoad_ += power_;
             }
         }
 
-        for (auto device_ : devices) {
-           device_->process();
+        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+            device[i_].process();
         }
 
         if (ntpClient.isInitialized()) {
@@ -126,44 +127,43 @@ void loop() {
             SERIAL_WEB_SERIALLN("----");
         }
     }
-	else {
-        for (auto device_ : devices) {
-            if (device_->isEnabled() &&device_->isActive()) {
-               device_->setEnabled(false);
-               SERIAL_WEB_SERIALF("Disabled consumer: %s\n",device_->getDesignation().c_str());
+    else {
+        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+            if (device[i_].isEnabled() && device[i_].isActive()) {
+                device[i_].setEnabled(false);
+                SERIAL_WEB_SERIALF("Disabled consumer: %s\n", device[i_].getDesignation().c_str());
             }
-        };
-	}
+        }
+    }
 
-	if (gParamsChanged) {
-        for (auto device_ : devices) {
-           device_->end();
-           device_->begin();
+    if (gParamsChanged) {
+        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+            device[i_].end();
+            device[i_].begin();
 
-            if (!device_->isActive()){
-               device_->setEnabled(false);
-               device_->applyDefaultValue();
-			}
-
+            if (!device[i_].isActive()) {
+                device[i_].setEnabled(false);
+                device[i_].applyDefaultValue();
+            }
         }
 
-		inverter.end();
-		inverter.begin(inverterConfig.getIPAddress(), inverterConfig.getPort(), inverterConfig.getInterval());
+        inverter.end();
+        inverter.begin(inverterConfig.getIPAddress(), inverterConfig.getPort(), inverterConfig.getInterval());
 
         if (ntpConfig.useNtpServer()) {
             ntpClient.begin(ntpConfig.ntpServer(), ntpConfig.timeZone(), 0);
         }
-	}
+    }
 
     if (ShouldReboot) {
         SERIAL_WEB_SERIALLN("Rebooting...");
-        for (auto device_ : devices) {
-           device_->end();
+        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+            device[i_].end();
         }
-		inverter.end();
+        inverter.end();
         delay(1000);
         ESP.restart();
-	}
+    }
 
-	gParamsChanged = false;
+    gParamsChanged = false;
 }

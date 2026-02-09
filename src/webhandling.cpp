@@ -57,6 +57,19 @@ AsyncWebServer server(80);
 AsyncWebServerWrapper asyncWebServerWrapper(&server);
 AsyncUpdateServer AsyncUpdater;
 
+SwitchDevice device[MAX_DEVICES] = {
+    SwitchDevice("Device1", "Device 1"),
+    SwitchDevice("Device2", "Device 2"),
+    SwitchDevice("Device3", "Device 3"),
+    SwitchDevice("Device4", "Device 4"),
+    SwitchDevice("Device5", "Device 5"),
+    SwitchDevice("Device6", "Device 6"),
+    SwitchDevice("Device7", "Device 7"),
+    SwitchDevice("Device8", "Device 8"),
+    SwitchDevice("Device9", "Device 9"),
+    SwitchDevice("Device10", "Device 10")
+};
+
 const char html_form_end[] PROGMEM = R"=====(
 </br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>
 </br><a href='/'>Home</a>
@@ -238,8 +251,8 @@ protected:
         s_ += F("       document.getElementById('gridPowerDirection').innerHTML = \"from Grid\";\n");
         s_ += F("   }\n");
 
-        for (size_t i_ = 0; i_ < devices.size(); ++i_) {
-            if (devices[i_]->isActive()) {
+        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+            if (device[i_].isActive()) {
                 s_ += "   updateLED(document.getElementById('device" + String(i_ + 1) + "'), jsonData.SwitchDevices.device" + String(i_ + 1) + ".toLowerCase());\n";
             }
         }
@@ -255,8 +268,6 @@ AsyncIotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiIn
 InverterConfig inverterConfig = InverterConfig();
 NtpConfig ntpConfig = NtpConfig();
 
-std::vector<SwitchDevice*> devices;
-
 void wifiInit() {
     Serial.begin(115200);
     Serial.println();
@@ -268,21 +279,16 @@ void wifiInit() {
 
     iotWebConf.setHtmlFormatProvider(&customHtmlFormatProvider);
 
-	// -- Create SwitchDevice instances and chain them.
-    SwitchDevice* prev_ = nullptr;
-    for (int i_ = 1; i_ <= 10; ++i_) {
-        auto* dev_ = new SwitchDevice(("Device" + String(i_)).c_str());
-        devices.push_back(dev_);
-        if (prev_) prev_->setNext(dev_);
-        prev_ = dev_;
-    }
+    for (size_t i_ = 0; i_ < MAX_DEVICES - 1; ++i_) {
+		device[i_].setNext(&device[i_ + 1]);
+	}
 
     iotWebConf.addParameterGroup(&inverterConfig);
 	iotWebConf.addParameterGroup(&ntpConfig);
 
-    for (auto device_ : devices) {
-        iotWebConf.addParameterGroup(device_);
-    }
+    for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+        iotWebConf.addParameterGroup(&device[i_]);
+	}
 
     // -- Define how to handle updateServer calls.
     iotWebConf.setupUpdateServer(
@@ -302,13 +308,17 @@ void wifiInit() {
     // -- Initializing the configuration.
     iotWebConf.init();
 
-    convertParams();
-
     // -- Set up required URL handlers on the web server.
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) { handleRoot(request); });
 
     server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse* response_ = request->beginResponse_P(200, "image/x-icon", favicon_ico, sizeof(favicon_ico));
+        request->send(response_);
+        }
+    );
+
+    server.on("/apple-touch-icon.png", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse* response_ = request->beginResponse_P(200, "image/png", favicon_ico, sizeof(favicon_ico));
         request->send(response_);
         }
     );
@@ -432,26 +442,27 @@ void handleData(AsyncWebServerRequest* request) {
     json_ += "}";
 
     json_ += ",\"SwitchDevices\":{";
-    for (size_t i_ = 0; i_ < devices.size(); ++i_) {
-        if (devices[i_]->isActive()) {
-            switch (devices[i_]->getStatus()) {
+
+    for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+        if (device[i_].isActive()) {
+            switch (device[i_].getStatus()) {
             case SwitchDevice::Enabled:
                 json_ += "\"device" + String(i_ + 1) + "\":\"On\"";
                 break;
-            case  SwitchDevice::DelayedOff:
+            case SwitchDevice::DelayedOff:
                 json_ += "\"device" + String(i_ + 1) + "\":\"DelayedOff\"";
                 break;
-            case  SwitchDevice::Disabled:
+            case SwitchDevice::Disabled:
             default:
                 json_ += "\"device" + String(i_ + 1) + "\":\"Off\"";
                 break;
             }
             // Komma nur, wenn noch ein aktives Device folgt
-            if (i_ + 1 < devices.size()) {
+            if (i_ + 1 < MAX_DEVICES) {
                 // Suche, ob noch ein aktives Device folgt
                 bool moreActive_ = false;
-                for (size_t j_ = i_ + 1; j_ < devices.size(); ++j_) {
-                    if (devices[j_]->isActive()) {
+                for (size_t j_ = i_ + 1; j_ < MAX_DEVICES; ++j_) {
+                    if (device[j_].isActive()) {
                         moreActive_ = true;
                         break;
                     }
@@ -460,17 +471,18 @@ void handleData(AsyncWebServerRequest* request) {
             }
         }
     }
+
     json_ += "}";
     json_ += "}";
 	request->send(200, "application/json", json_);  
 }
 
 void handlePost(AsyncWebServerRequest* request) {
-    for (size_t i_ = 0; i_ < devices.size(); ++i_) {
+    for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
         String paramName = "device" + String(i_ + 1);
         if (request->hasParam(paramName, true)) {
             String value_ = request->getParam(paramName, true)->value();
-            devices[i_]->setEnabled(value_ == "on");
+            device[i_].setEnabled(value_ == "on");
         }
     }
 
@@ -478,8 +490,8 @@ void handlePost(AsyncWebServerRequest* request) {
         String value_ = request->getParam("reset", true)->value();
         if (value_ == "true") {
             Serial.println("apply default values...");
-            for (auto device_ : devices) {
-                device_->applyDefaultValue();
+            for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+                device[i_].applyDefaultValue();
             }
         }
     }
@@ -527,6 +539,10 @@ void handleRoot(AsyncWebServerRequest* request) {
 
     String response_ = "";
     response_ += fp_.getHtmlHead(iotWebConf.getThingName());
+
+    response_ += F("<link rel=\"icon\" type=\"image/png\" sizes=\"96x96\" href=\"/apple-touch-icon.png\">\n");
+    response_ += F("<link rel=\"apple-touch-icon\" sizes=\"96x96\" href=\"/apple-touch-icon.png\">\n");
+
     response_ += fp_.getHtmlStyle();
     response_ += fp_.getHtmlHeadEnd();
     response_ += fp_.getHtmlScript();
@@ -564,13 +580,15 @@ void handleRoot(AsyncWebServerRequest* request) {
 
     response_ += fp_.getHtmlFieldset("Device");
     response_ += fp_.getHtmlTable();
-    for (size_t i_ = 0; i_ < devices.size(); ++i_) {
-        if (devices[i_]->isActive()) {
+
+    for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+        if (device[i_].isActive()) {
             response_ += fp_.getHtmlTableRowClass(
-                devices[i_]->getDesignation() + ":", "led off", "device" + String(i_ + 1)
+                device[i_].getDesignation() + ":", "led " + String(device[i_].getStatus() == SwitchDevice::Enabled ? "on" : (device[i_].getStatus() == SwitchDevice::DelayedOff ? "delayedoff" : "off")), "device" + String(i_ + 1)
             );
         }
-    }
+	}
+
     response_ += fp_.getHtmlTableEnd();
     response_ += fp_.getHtmlFieldsetEnd();
 
@@ -608,11 +626,6 @@ iotwebconf::WifiAuthInfo* handleConnectWifiFailure() {
     return &auth_;
 }
 
-void convertParams() {
-    ArduinoOTA.setHostname(iotWebConf.getThingName());
-}
-
 void configSaved() {
-    convertParams();
     gParamsChanged = true;
 }
