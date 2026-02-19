@@ -41,6 +41,14 @@ void Inverter::process() {
             uint32_t(REQUEST_TYPE_STATUS)
         );
 
+        requestData(
+            _IPAddress,
+            _Port,
+            _MeterData.startAddress,
+            _MeterData.dataLength,
+            uint32_t(REQUEST_TYPE_METER)
+        );
+
         if (!_StatusData.isStandby()) {
             requestData(
                 _IPAddress,
@@ -48,14 +56,6 @@ void Inverter::process() {
                 _PowerData.startAddress,
                 _PowerData.dataLength,
                 uint32_t(REQUEST_TYPE_INVERTER)
-            );
-
-            requestData(
-                _IPAddress,
-                _Port,
-                _MeterData.startAddress,
-                _MeterData.dataLength,
-                uint32_t(REQUEST_TYPE_METER)
             );
         }
     }
@@ -199,6 +199,6 @@ void Inverter::requestData(const String& ipAddress, uint16_t port, uint16_t star
     }
     else {
         ESP_LOGI("INVERTER", "Request sent to inverter at %s:%d, start address=%d, count=%d, token=%08X",
-            ip.c_str(), port, startaddress, registerCount, token);
+            ipAddress.c_str(), port, startaddress, registerCount, token);
     }
 }
