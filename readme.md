@@ -107,6 +107,9 @@ This setting specifies the time interval in seconds between each polling of the 
 Default: 10 seconds  
 Range: 10-255 seconds
 
+Modbus error logs include the request token in hexadecimal: `000003E9` identifies
+inverter power, `000003EA` meter data, and `000003EB` inverter status.
+
 ### Time Source (NTP)
 #### Use NTP server
 Enable or disable NTP time synchronization  
