@@ -11,6 +11,10 @@ uint16_t getU16(const ModbusMessage& msg, uint16_t idx) {
     return (msg[idx] << 8) | msg[idx + 1];
 }
 
+int16_t getI16(const ModbusMessage& msg, uint16_t idx) {
+    return (int16_t)((msg[idx] << 8) | msg[idx + 1]);
+}
+
 int32_t getI32(const ModbusMessage& msg, uint16_t idx) {
     return (msg[idx] << 24) | (msg[idx + 1] << 16) | (msg[idx + 2] << 8) | msg[idx + 3];
 }
@@ -82,7 +86,7 @@ void Inverter::handleMeterData(ModbusMessage response, uint32_t token) {
     _MeterData.gridCurrentC = getI32(response, idx_) / 100.0f; idx_ += 4;
     _MeterData.activePower = getI32(response, idx_) * 1.0f; idx_ += 4;
     _MeterData.reactivePower = getI32(response, idx_) * 1.0f; idx_ += 4;
-    _MeterData.powerFactor = getU16(response, idx_) / 1000.0f; idx_ += 2;
+    _MeterData.powerFactor = getI16(response, idx_) / 1000.0f; idx_ += 2;
     _MeterData.gridFrequency = getU16(response, idx_) / 100.0f; idx_ += 2;
     _MeterData.positiveActiveElectricity = getI32(response, idx_) / 100.0f; idx_ += 4;
     _MeterData.reverseActivePower = getI32(response, idx_) / 100.0f; idx_ += 4;
