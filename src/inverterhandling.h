@@ -3,13 +3,9 @@
 #ifndef _INVERTERHANDLING_h
 #define _INVERTERHANDLING_h
 
-#if defined(ARDUINO) && ARDUINO >= 100
-	#include "arduino.h"
-#else
-	#include "WProgram.h"
-#endif
-
+#include <Arduino.h>
 #include <ModbusClientTCP.h>
+#include <neotimer.h>
 
 
 // startet mit Adresse 37100, Laenge 39
@@ -115,7 +111,7 @@ private:
     StatusData _StatusData;
     MeterData _MeterData;
 
-    char _IPAddress[15] = "0.0.0.0";
+    char _IPAddress[16] = "0.0.0.0";
     int _Port = 502;
 
     void handleMeterData(ModbusMessage response, uint32_t token);

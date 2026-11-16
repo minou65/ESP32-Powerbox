@@ -1,18 +1,17 @@
 #include <Arduino.h>
-#include <ArduinoOTA.h>
 #include <WiFi.h>
+
+#include <IotWebConfAsyncUpdateServer.h>
+#include <IotWebRoot.h>
+#include <IotWebConfTParameter.h>
+#include <DNSServer.h>
+
+#include <EventLogger.h>
 
 #include "common.h"
 #include "webhandling.h"
 #include "favicon.h"
 #include "inverterhandling.h"
-
-#include <DNSServer.h>
-
-#include <IotWebConfAsyncUpdateServer.h>
-#include <IotWebRoot.h>
-#include <IotWebConfUsing.h>
-#include <IotWebConfTParameter.h>
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
 #define CONFIG_VERSION "A5"
@@ -31,7 +30,6 @@
 const char thingName[] = "PowerBox";
 
 // -- Method declarations.
-void onProgress(size_t prg, size_t sz);
 void handleRoot(AsyncWebServerRequest* request);
 void handleDateTime(AsyncWebServerRequest* request);
 void handlePower(AsyncWebServerRequest* request);
@@ -40,6 +38,7 @@ void handlePost(AsyncWebServerRequest* requestrequest);
 void handleAPPasswordMissingPage(iotwebconf::WebRequestWrapper* webRequestWrapper);
 void handleSSIDNotConfiguredPage(iotwebconf::WebRequestWrapper* webRequestWrapper);
 void handleConfigSavedPage(iotwebconf::WebRequestWrapper* webRequestWrapper);
+void handleWebCommand(const String& command);
 void convertParams();
 void connectWifi(const char* ssid, const char* password);
 iotwebconf::WifiAuthInfo* handleConnectWifiFailure();
@@ -51,6 +50,7 @@ void wifiConnected();
 bool gParamsChanged = true;
 bool startAPMode = true;
 bool ShouldReboot = false;  
+bool debugMode = false;
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
@@ -269,10 +269,8 @@ InverterConfig inverterConfig = InverterConfig();
 NtpConfig ntpConfig = NtpConfig();
 
 void wifiInit() {
-    Serial.begin(115200);
-    Serial.println();
-    Serial.println("starting up...");
-
+ 
+    LOG_INFO("Initializing WiFi...");
 
     iotWebConf.setStatusPin(STATUS_PIN, ON_LEVEL);
     iotWebConf.setConfigPin(CONFIG_PIN);
@@ -290,10 +288,21 @@ void wifiInit() {
         iotWebConf.addParameterGroup(&device[i_]);
 	}
 
-    // -- Define how to handle updateServer calls.
     iotWebConf.setupUpdateServer(
-        [](const char* updatePath) { AsyncUpdater.setup(&server, updatePath, onProgress); },
+        [](const char* updatePath) {
+            AsyncUpdater.onBegin([](const String& message) {
+                LOG_INFO("%s", message.c_str());
+                });
+            AsyncUpdater.onEnd([](const String& message) { LOG_OK("%s", message.c_str()); });
+            AsyncUpdater.OnError([](const String& message) {
+                LOG_ERROR("%s", message.c_str());
+                });
+            AsyncUpdater.onProgress([](const String& message) { LOG_INFO("%s", message.c_str()); });
+            AsyncUpdater.onLog([](const String& message) { WEB_LOG_INFO("%s", message.c_str()); });
+            AsyncUpdater.setup(&server, updatePath);
+        },
         [](const char* userName, char* password) { AsyncUpdater.updateCredentials(userName, password); });
+
 
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
@@ -352,42 +361,41 @@ void wifiInit() {
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* request) { handleData(request); });
     server.on("/post", HTTP_POST, [](AsyncWebServerRequest* request) { handlePost(request); });
 
+    // EventLogger Web initialisieren
+    bool webOk_ = eventLogger.beginWeb(&server, "/events");
+    if (!webOk_) {
+        LOG_ERROR("EventLogger.beginWeb failed");
+    }
+
+    eventLogger.setCommandCallback([](const String& command_) {
+        handleWebCommand(command_);
+        });    
+
     server.onNotFound([](AsyncWebServerRequest* request) {
         AsyncWebRequestWrapper asyncWebRequestWrapper_(request);
         iotWebConf.handleNotFound(&asyncWebRequestWrapper_);
         }
     );
 
-    WebSerial.begin(&server, "/webserial");
 
-    Serial.println("Ready.");
+
+    
 }
 
 void wifiLoop() {
     iotWebConf.doLoop();
-    ArduinoOTA.handle();
-
+    
     if (!ShouldReboot) {
 		ShouldReboot = AsyncUpdater.isFinished();
 	}
 }
 
 void wifiConnected(){
-    ArduinoOTA.begin();
-}
 
-void onProgress(size_t prg, size_t sz) {
-    static size_t lastPrinted_ = 0;
-    size_t currentPercent_ = (prg * 100) / sz;
-
-    if (currentPercent_ % 5 == 0 && currentPercent_ != lastPrinted_) {
-        Serial.printf("Progress: %d%%\n", currentPercent_);
-        lastPrinted_ = currentPercent_;
-    }
 }
 
 void handleDateTime(AsyncWebServerRequest* request) {
-    ESP_LOGD("handleDateTime", "Time requested");
+    // LOG_DEBUG("handleDateTime: Time requested");
 
     // Get the current time
     time_t now_ = time(nullptr);
@@ -529,6 +537,54 @@ void handleConfigSavedPage(iotwebconf::WebRequestWrapper* webRequestWrapper) {
     webRequestWrapper->send(302, "text/plain", "Config saved");
 }
 
+void handleWebCommandStatus() {
+    time_t now_ = time(nullptr);
+    struct tm* timeinfo_ = localtime(&now_);
+    char dateTimeStr_[32];
+    strftime(dateTimeStr_, sizeof(dateTimeStr_), "%Y-%m-%d %H:%M:%S", timeinfo_);
+
+    WEB_LOG_INFO("=== Status ===");
+    WEB_LOG_INFO_AT(1, "Time:          %s", dateTimeStr_);
+    WEB_LOG_INFO_AT(1, "WiFi RSSI:     %d dBm", WiFi.RSSI());
+
+    WEB_LOG_INFO("==============");
+}
+
+void handleWebCommandHelp() {
+    WEB_LOG_INFO("Available commands:");
+    WEB_LOG_INFO_AT(1, "status     - show current values");
+    WEB_LOG_INFO_AT(1, "debug      - toggle debug output");
+    WEB_LOG_INFO_AT(1, "help       - show this help");
+}
+
+void handleWebCommandDebug() {
+    debugMode = !debugMode;
+    WEB_LOG_INFO("Debug logging: %s", (debugMode ? "ON" : "OFF"));
+}
+
+void handleWebCommand(const String& command){
+    String cmd_ = command;
+    cmd_.trim();
+    cmd_.toLowerCase();
+
+    if (cmd_ == "status") {
+        handleWebCommandStatus();
+        return;
+    }
+
+    if (cmd_ == "debug") {
+        handleWebCommandDebug();
+        return;
+    }
+
+    if (cmd_ == "help") {
+        handleWebCommandHelp();
+        return;
+    }
+
+    WEB_LOG_WARN("Unknown command. Type 'help' for available commands.");
+}
+
 void handleRoot(AsyncWebServerRequest* request) {
     AsyncWebRequestWrapper asyncWebRequestWrapper(request);
     if (iotWebConf.handleCaptivePortal(&asyncWebRequestWrapper)) {
@@ -604,7 +660,7 @@ void handleRoot(AsyncWebServerRequest* request) {
     response_ += fp_.getHtmlTable();
 
     response_ += fp_.getHtmlTableRowText("Open <a href='/config'>configuration page</a>.");
-    response_ += fp_.getHtmlTableRowText("Open <a href='/webserial' target='_blank'>WebSerial Console</a> for live logs.");
+    response_ += fp_.getHtmlTableRowText("Open <a id='eventsLink' href='/events' target='_blank' rel='noopener'>Live Events</a> for live logs.");
     response_ += fp_.getHtmlTableRowText(fp_.getHtmlVersion(Version));
     response_ += fp_.getHtmlTableEnd();
 
@@ -616,8 +672,8 @@ void handleRoot(AsyncWebServerRequest* request) {
 }
 
 void connectWifi(const char* ssid, const char* password) {
-    Serial.println("Connecting to WiFi ...");
     WiFi.begin(ssid, password);
+    LOG_OK("WiFi connection initiated, SSID: %s", String(ssid).c_str());
 }
 
 iotwebconf::WifiAuthInfo* handleConnectWifiFailure() {

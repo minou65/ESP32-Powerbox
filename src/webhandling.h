@@ -9,36 +9,18 @@
 #include <IotWebConf.h>
 #include <IotWebConfAsync.h>
 #include <IotWebConfOptionalGroup.h>
-#include <WebSerial.h>
+#include <neotimer.h>
+#include <EventLogger.h>
+
 #include "common.h"
-
-
-#define SERIAL_WEB_SERIAL(...) \
-    do { \
-        Serial.print(__VA_ARGS__); \
-        WebSerial.print(__VA_ARGS__); \
-    } while(0)
-
-#define SERIAL_WEB_SERIALLN(...) \
-    do { \
-        Serial.println(__VA_ARGS__); \
-        WebSerial.println(__VA_ARGS__); \
-    } while(0)
-#define SERIAL_WEB_SERIALF(fmt, ...) \
-    do { \
-        Serial.printf(fmt, __VA_ARGS__); \
-        char _buf[128]; \
-        snprintf(_buf, sizeof(_buf), fmt, __VA_ARGS__); \
-        WebSerial.print(_buf); \
-    } while(0)
 
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
 const char wifiInitialApPassword[] = "123456789";
 
 #define MAX_DEVICES 10
 
-extern void wifiInit();
-extern void wifiLoop();
+void wifiInit();
+void wifiLoop();
 
 static WiFiClient wifiClient;
 
@@ -145,6 +127,7 @@ public:
         bool shouldDisable_ = currentTime_ >= getOffTime();
 
         if (_Enabled && shouldEnable_ && !shouldDisable_) {
+            LOG_INFO("Device %s enabled", getDesignation().c_str());
             if (getType() == RelayType) {
                 pinMode(getGPIO(), OUTPUT);
                 digitalWrite(getGPIO(), HIGH);
@@ -155,6 +138,7 @@ public:
             _timer.stop();
         }
         else if (!_Enabled && _timer.done() && _timer.started()) {
+            LOG_INFO("Device %s turned off after delay (%us)", getDesignation().c_str(), getDelay());
             if (getType() == RelayType) {
                 digitalWrite(getGPIO(), LOW);
             }
@@ -162,7 +146,6 @@ public:
                 sendHttpRequest(getUrlOff());
             }
             _timer.stop();
-            Serial.printf("Device %s turned off after delay\n", getDesignation().c_str());
         }
     }
 
