@@ -33,9 +33,11 @@ String gNTPServer = "ntp.metas.ch"; // "pool.ntp.org";
 String gTimeZone = "CET-1CEST,M3.5.0,M10.5.0/3";
 bool gUseNTPServer = true;
 
-const float PV_POWER_RESERVE_ON = 200.0f;   // Einschalt-Reserve
-const float PV_POWER_RESERVE_OFF = 400.0f;  // Ausschalt-Reserve (gr��er!)
+const float PV_POWER_RESERVE_ON = 200.0f;   // Power reserve for turning on
+const float PV_POWER_RESERVE_OFF = 400.0f;  // Power reserve for turning off (greater!)
 Neotimer printTimer(60000); // 60 Sekunden
+Neotimer inverterStartupDelay(60000); // 1 minute delay after system goes online before starting inverter polling
+bool inverterStartupDelayTriggered = false;
 Inverter inverter(wifiClient);
 
 void setup() {
@@ -71,71 +73,79 @@ void setup() {
 void loop() {
     wifiLoop();
     if (iotWebConf.getState() == iotwebconf::OnLine) {
+        // Start delay timer on first OnLine transition
+        if (!inverterStartupDelayTriggered) {
+            inverterStartupDelay.start();
+            inverterStartupDelayTriggered = true;
+            LOG_INFO("System OnLine - Waiting 1 minute before inverter polling starts");
+        }
 
-        inverter.process();
+        // Only start inverter polling after startup delay
+        if (inverterStartupDelay.done()) {
+            inverter.process();
 
-        PowerData powerData_ = inverter.getPowerData();
-        MeterData meterData_ = inverter.getMeterData();
+            PowerData powerData_ = inverter.getPowerData();
+            MeterData meterData_ = inverter.getMeterData();
 
-        float inverterActivePower_ = powerData_.activePower * 1000; // kW to W
-        float gridPower_ = meterData_.activePower; // W
+            float inverterActivePower_ = powerData_.activePower * 1000; // kW to W
+            float gridPower_ = meterData_.activePower; // W
 
-        float totalEnabledPower_ = 0;
-        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
-            float power_ = device[i_].getPower();
+            float totalEnabledPower_ = 0;
+            for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+                float power_ = device[i_].getPower();
 
-            if (device[i_].isEnabled() && device[i_].isActive()) {
-                totalEnabledPower_ += power_;
+                if (device[i_].isEnabled() && device[i_].isActive()) {
+                    totalEnabledPower_ += power_;
+                }
             }
-        }
 
-        // Calculate available PV power
-        // Note: In the inverter, gridPower_ > 0 means feed-in, gridPower_ < 0 means grid consumption!
-        float availablePVPower_;
-        if (gridPower_ > 0) {
-            availablePVPower_ = gridPower_ - PV_POWER_RESERVE_ON + totalEnabledPower_;
-            if (availablePVPower_ < 0) availablePVPower_ = 0;
-            if (availablePVPower_ > inverterActivePower_) availablePVPower_ = inverterActivePower_;
-        }
-        else {
-            // Power is being drawn from the grid or balanced: no PV surplus available
-            availablePVPower_ = 0;
-        }
-
-        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
-            device[i_].setEnabled(false);
-        }
-
-        float remainingPVPower_ = availablePVPower_;
-        float totalConsumerLoad_ = 0;
-        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
-            float power_ = device[i_].getPower();
-            float partialPower_ = power_ * device[i_].getPartialLoadThreshold();
-            if (device[i_].isActive() && (
-                power_ <= remainingPVPower_ ||
-                (device[i_].isPartialLoadAllowed() && partialPower_ <= remainingPVPower_)
-                )) {
-                device[i_].setEnabled(true);
-                remainingPVPower_ -= power_;
-                totalConsumerLoad_ += power_;
+            // Calculate available PV power
+            // Note: In the inverter, gridPower_ > 0 means feed-in, gridPower_ < 0 means grid consumption!
+            float availablePVPower_;
+            if (gridPower_ > 0) {
+                availablePVPower_ = gridPower_ - PV_POWER_RESERVE_ON + totalEnabledPower_;
+                if (availablePVPower_ < 0) availablePVPower_ = 0;
+                if (availablePVPower_ > inverterActivePower_) availablePVPower_ = inverterActivePower_;
             }
-        }
+            else {
+                // Power is being drawn from the grid or balanced: no PV surplus available
+                availablePVPower_ = 0;
+            }
 
-        for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
-            device[i_].process();
+            for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+                device[i_].setEnabled(false);
+            }
+
+            float remainingPVPower_ = availablePVPower_;
+            float totalConsumerLoad_ = 0;
+            for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+                float power_ = device[i_].getPower();
+                float partialPower_ = power_ * device[i_].getPartialLoadThreshold();
+                if (device[i_].isActive() && (
+                    power_ <= remainingPVPower_ ||
+                    (device[i_].isPartialLoadAllowed() && partialPower_ <= remainingPVPower_)
+                    )) {
+                    device[i_].setEnabled(true);
+                    remainingPVPower_ -= power_;
+                    totalConsumerLoad_ += power_;
+                }
+            }
+
+            for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
+                device[i_].process();
+            }
+
+            if (printTimer.repeat()) {
+                WEB_LOG_INFO("Inverter active power:%.2f W", inverterActivePower_);
+                WEB_LOG_INFO("Grid power:%.2f W", gridPower_);
+                WEB_LOG_INFO("Total consumer load:%.2f W", totalConsumerLoad_);
+                WEB_LOG_INFO("Available PV power:%.2f W", availablePVPower_);
+                WEB_LOG_INFO("----");
+            }
         }
 
         if (ntpClient.isInitialized()) {
             ntpClient.process();
-        }
-
-        if (printTimer.repeat()) {
-            
-            LOG_INFO("Inverter active power:%.2f W", inverterActivePower_);
-            LOG_INFO("Grid power:%.2f W", gridPower_);
-            LOG_INFO("Total consumer load:%.2f W", totalConsumerLoad_);
-            LOG_INFO("Available PV power:%.2f W", availablePVPower_);
-            LOG_INFO("----");
         }
     }
     else {
