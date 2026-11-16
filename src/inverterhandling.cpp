@@ -27,7 +27,7 @@ Inverter::Inverter(WiFiClient& client) :
 
 void Inverter::begin(const String& ipAddress, const uint16_t port, const uint8_t interval) {
     _modbusClient.onErrorHandler([this](Error error, uint32_t token) { handleError(error, token); });
-    _modbusClient.setTimeout(2000, 10);
+    _modbusClient.setTimeout(5000, 10);
     _modbusClient.onDataHandler([this](ModbusMessage response, uint32_t token) { handleData(response, token); });
     _modbusClient.closeConnectionOnTimeouts(3);
     _modbusClient.begin();
@@ -214,7 +214,7 @@ void Inverter::handleData(ModbusMessage response, uint32_t token) {
 
 void Inverter::handleError(Error error, uint32_t token) {
     ModbusError me_(error);
-    LOG_ERROR("INVERTER: Error response: %02X - %s", (int)me_, (const char*)me_);
+    LOG_ERROR("INVERTER: Error response: %02X - %s, token=%08X", (int)me_, (const char*)me_, token);
 }
 
 void Inverter::requestData(const String& ipAddress, uint16_t port, uint16_t startaddress, uint16_t registerCount, uint32_t token) {
@@ -229,7 +229,7 @@ void Inverter::requestData(const String& ipAddress, uint16_t port, uint16_t star
     Error err_ = _modbusClient.addRequest(token, slave_, READ_HOLD_REGISTER, startaddress, registerCount);
     if (err_ != SUCCESS) {
         ModbusError e_(err_);
-        LOG_ERROR("INVERTER: Error creating request: %02X - %s", (int)e_, (const char*)e_);
+        LOG_ERROR("INVERTER: Error creating request: %02X - %s, token=%08X", (int)e_, (const char*)e_, token);
     }
     else {
         if (debugMode) {
