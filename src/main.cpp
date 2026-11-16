@@ -9,17 +9,22 @@
 
 #define IOTWEBCONF_DEBUG_DISABLED
 
-#include "ntp.h"
+#include <Arduino.h>
+#include <NTPClient.h>
 #include <IotWebConf.h>
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
+#include <EventLogger.h> // must be included after webhandling.h
+#include <neotimer.h>
+#include <build_version.h>
 
 #include "common.h"
 
 #include "inverterhandling.h"
 #include "webhandling.h"
-#include "version.h"
-#include "neotimer.h"
+
+
+
 
 char Version[] = VERSION_STR; // Manufacturer's Software version code
 
@@ -29,7 +34,7 @@ String gTimeZone = "CET-1CEST,M3.5.0,M10.5.0/3";
 bool gUseNTPServer = true;
 
 const float PV_POWER_RESERVE_ON = 200.0f;   // Einschalt-Reserve
-const float PV_POWER_RESERVE_OFF = 400.0f;  // Ausschalt-Reserve (größer!)
+const float PV_POWER_RESERVE_OFF = 400.0f;  // Ausschalt-Reserve (grï¿½ï¿½er!)
 Neotimer printTimer(60000); // 60 Sekunden
 Inverter inverter(wifiClient);
 
@@ -39,16 +44,21 @@ void setup() {
 	while (!Serial) {
 		delay(1);
 	}
-	Serial.println("PV Powerbox v" + String(Version) + " started");
+
+    LOG_INFO("PV Powerbox v%s started", Version);
 
 	wifiInit();
+    LOG_OK("WiFi initialized");
+
     inverter.begin(inverterConfig.getIPAddress(), inverterConfig.getPort(), inverterConfig.getInterval());
+    LOG_OK("Inverter initialized");
 
 	if (ntpConfig.useNtpServer()) {
 		ntpClient.begin(ntpConfig.ntpServer(), ntpConfig.timeZone(), 0);
+        LOG_OK("NTP client initialized");
 	}
 	else {
-		Serial.println(F("NTP not used"));
+        LOG_INFO("NTP not used");
 	}
 
 	printTimer.start();
@@ -73,7 +83,7 @@ void loop() {
         float totalEnabledPower_ = 0;
         for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
             float power_ = device[i_].getPower();
-            float partialPower_ = power_ * device[i_].getPartialLoadThreshold();
+
             if (device[i_].isEnabled() && device[i_].isActive()) {
                 totalEnabledPower_ += power_;
             }
@@ -120,18 +130,19 @@ void loop() {
         }
 
         if (printTimer.repeat()) {
-            SERIAL_WEB_SERIALF("Inverter active power:%.2f W\n", inverterActivePower_);
-            SERIAL_WEB_SERIALF("Grid power:%.2f W\n", gridPower_);
-            SERIAL_WEB_SERIALF("Total consumer load:%.2f W\n", totalConsumerLoad_);
-            SERIAL_WEB_SERIALF("Available PV power:%.2f W\n", availablePVPower_);
-            SERIAL_WEB_SERIALLN("----");
+            
+            LOG_INFO("Inverter active power:%.2f W", inverterActivePower_);
+            LOG_INFO("Grid power:%.2f W", gridPower_);
+            LOG_INFO("Total consumer load:%.2f W", totalConsumerLoad_);
+            LOG_INFO("Available PV power:%.2f W", availablePVPower_);
+            LOG_INFO("----");
         }
     }
     else {
         for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
             if (device[i_].isEnabled() && device[i_].isActive()) {
                 device[i_].setEnabled(false);
-                SERIAL_WEB_SERIALF("Disabled consumer: %s\n", device[i_].getDesignation().c_str());
+                LOG_INFO("Disabled consumer: %s", device[i_].getDesignation().c_str());
             }
         }
     }
@@ -156,7 +167,7 @@ void loop() {
     }
 
     if (ShouldReboot) {
-        SERIAL_WEB_SERIALLN("Rebooting...");
+        LOG_INFO("Rebooting...");
         for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
             device[i_].end();
         }
