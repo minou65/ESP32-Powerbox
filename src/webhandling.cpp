@@ -89,13 +89,11 @@ function postReset() {
     });
 }
 </script>
-)=====";
-
-const char html_end_template[] PROGMEM = R"=====(
-</div></body></html>
-    <script>
+<!-- Initialize field visibility after the config controls have been rendered. -->
+<script>
         function updateDeviceFields(deviceNum) {
             var typeSelect = document.getElementById('Device' + deviceNum + '-typeselect');
+            if (!typeSelect) return;
             var type = typeSelect.value;
 
             var fields = [
@@ -111,66 +109,61 @@ const char html_end_template[] PROGMEM = R"=====(
                 'partialloadallowed'
             ];
 
-            // Hide all fields first
             fields.forEach(function (field) {
                 var el = document.getElementById('Device' + deviceNum + '-' + field);
-                if (el) el.parentElement.style.display = 'none';
+                if (el && el.parentElement) el.parentElement.style.display = 'none';
             });
 
             if (type !== '-') {
-                // Show common fields
                 ['designation', 'power', 'delay', 'ontime', 'offtime'].forEach(function (field) {
                     var el = document.getElementById('Device' + deviceNum + '-' + field);
-                    if (el) el.parentElement.style.display = '';
+                    if (el && el.parentElement) el.parentElement.style.display = '';
                 });
 
-                // Show specific fields
                 if (type === 'Relay') {
                     var el = document.getElementById('Device' + deviceNum + '-relayselect');
-                    if (el) el.parentElement.style.display = '';
+                    if (el && el.parentElement) el.parentElement.style.display = '';
                 } else if (type === 'URL') {
                     ['urlon', 'urloff'].forEach(function (field) {
                         var el = document.getElementById('Device' + deviceNum + '-' + field);
-                        if (el) el.parentElement.style.display = '';
+                        if (el && el.parentElement) el.parentElement.style.display = '';
                     });
                 }
 
-                // Show partial load checkbox always
                 var partialLoadAllowedEl = document.getElementById('Device' + deviceNum + '-partialloadallowed');
-                if (partialLoadAllowedEl) partialLoadAllowedEl.parentElement.style.display = '';
-
-                // Show/hide partial load factor depending on checkbox
                 var partialLoadFactorEl = document.getElementById('Device' + deviceNum + '-partialloadfactor');
-                if (partialLoadAllowedEl && partialLoadFactorEl) {
-                    if (partialLoadAllowedEl.checked) {
-                        partialLoadFactorEl.parentElement.style.display = '';
-                    } else {
-                        partialLoadFactorEl.parentElement.style.display = 'none';
-                    }
+                if (partialLoadAllowedEl && partialLoadAllowedEl.parentElement) {
+                    partialLoadAllowedEl.parentElement.style.display = '';
+                }
+                if (partialLoadFactorEl && partialLoadFactorEl.parentElement) {
+                    partialLoadFactorEl.parentElement.style.display =
+                        partialLoadAllowedEl && partialLoadAllowedEl.checked ? '' : 'none';
                 }
             }
         }
 
-        // Initial setup and event binding for all devices
         for (var i = 1; i <= 10; i++) {
-            (function (i) {
-                var select = document.getElementById('Device' + i + '-typeselect');
-                var partialLoadAllowedEl = document.getElementById('Device' + i + '-partialloadallowed');
+            (function (deviceNum) {
+                var select = document.getElementById('Device' + deviceNum + '-typeselect');
+                var partialLoadAllowedEl = document.getElementById('Device' + deviceNum + '-partialloadallowed');
                 if (select) {
                     select.addEventListener('change', function () {
-                        updateDeviceFields(i);
+                        updateDeviceFields(deviceNum);
                     });
                 }
                 if (partialLoadAllowedEl) {
                     partialLoadAllowedEl.addEventListener('change', function () {
-                        updateDeviceFields(i);
+                        updateDeviceFields(deviceNum);
                     });
                 }
-                // Initial call
-                updateDeviceFields(i);
+                updateDeviceFields(deviceNum);
             })(i);
         }
-    </script>
+</script>
+)=====";
+
+const char html_end_template[] PROGMEM = R"=====(
+</div>
 )=====";
 
 class CustomHtmlFormatProvider : public iotwebconf::OptionalGroupHtmlFormatProvider {
