@@ -15,6 +15,7 @@
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
 #include <EventLogger.h> // must be included after webhandling.h
+#include <HeapMonitor.h>
 #include <neotimer.h>
 #include <build_version.h>
 
@@ -68,10 +69,13 @@ void setup() {
     for (size_t i_ = 0; i_ < MAX_DEVICES; ++i_) {
         device[i_].begin();
     }
+
+    beginHeapMonitor();
 }
 
 void loop() {
     wifiLoop();
+    loopHeapMonitor();
     if (iotWebConf.getState() == iotwebconf::OnLine) {
         // Start delay timer on first OnLine transition
         if (!inverterStartupDelayTriggered) {

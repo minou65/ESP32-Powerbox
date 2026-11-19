@@ -91,6 +91,9 @@ The RSSI is displayed in dBm at the top right of the homepage. RSSI is a measure
 - **Very Good Signal Strength:** Approximately -67 dBm. Suitable for applications like VoIP/VoWi-Fi and streaming video.
 - **Moderate Signal Strength:** Around -70 dBm.
 
+### Heap monitoring
+EventLogger records the free heap at startup and generates a heap report at local midnight after the system clock has been synchronized. The detailed report is streamed to connected web-console clients, with a compact summary retained in the event log.
+
 ## Settings
 ### Inverter
 #### IPAddress
