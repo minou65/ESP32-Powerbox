@@ -127,7 +127,10 @@ public:
         bool shouldDisable_ = currentTime_ >= getOffTime();
 
         if (_Enabled && shouldEnable_ && !shouldDisable_) {
-            LOG_INFO("Device %s enabled", getDesignation().c_str());
+            if (!_enabledLogReported) {
+                LOG_INFO("Device %s enabled", getDesignation().c_str());
+                _enabledLogReported = true;
+            }
             if (getType() == RelayType) {
                 pinMode(getGPIO(), OUTPUT);
                 digitalWrite(getGPIO(), HIGH);
@@ -139,6 +142,7 @@ public:
         }
         else if (!_Enabled && _timer.done() && _timer.started()) {
             LOG_INFO("Device %s turned off after delay (%u min)", getDesignation().c_str(), getDelay());
+            _enabledLogReported = false;
             if (getType() == RelayType) {
                 digitalWrite(getGPIO(), LOW);
             }
@@ -156,6 +160,7 @@ public:
         }
         setEnabled(false);
         _timer.stop();
+        _enabledLogReported = false;
     }
 
     void end() {
@@ -285,6 +290,7 @@ private:
 
 
     bool _Enabled;
+    bool _enabledLogReported = false;
     Neotimer _timer;
     HTTPClient _http;
     Status _lastStatus;
