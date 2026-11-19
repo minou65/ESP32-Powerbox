@@ -138,7 +138,7 @@ public:
             _timer.stop();
         }
         else if (!_Enabled && _timer.done() && _timer.started()) {
-            LOG_INFO("Device %s turned off after delay (%us)", getDesignation().c_str(), getDelay());
+            LOG_INFO("Device %s turned off after delay (%u min)", getDesignation().c_str(), getDelay());
             if (getType() == RelayType) {
                 digitalWrite(getGPIO(), LOW);
             }
